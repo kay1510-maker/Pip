@@ -32,7 +32,7 @@ jobs:
       - name: Pip-Projekt aus ZIP entpacken
         run: |
           mkdir pip-src
-          unzip -q Pip-v3.6-Natuerliche-Pip.zip -d pip-src
+          unzip -q Pip-v3.8-Qwen-1.5B-Supertonic.zip -d pip-src
 
       - name: Android-Projekt auf SDK 36 aktualisieren
         run: |
