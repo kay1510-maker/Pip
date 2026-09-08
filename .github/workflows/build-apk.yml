@@ -31,7 +31,7 @@ jobs:
       - name: Pip-Projekt aus ZIP entpacken
         run: |
           mkdir -p pip-src
-          unzip -q Pip-v4.4-Qwen-1.5B-Supertonic.zip -d pip-src
+          unzip -q Pip-v4.5-Qwen-1.5B-Supertonic.zip -d pip-src
 
       - name: Sherpa-ONNX laden
         run: |
