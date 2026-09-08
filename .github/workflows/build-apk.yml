@@ -33,7 +33,13 @@ jobs:
         run: |
           mkdir pip-src
           unzip -q Pip-v4.4-Qwen-1.5B-Supertonic.zip -d pip-src
-
+- name: Sherpa-ONNX laden
+  run: |
+    mkdir -p pip-src/app/libs
+    curl -L --fail --retry 5 \
+      -o pip-src/app/libs/sherpa-onnx-1.13.7.aar \
+      https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.7/sherpa-onnx-1.13.7.aar
+    test -s pip-src/app/libs/sherpa-onnx-1.13.7.aar
       - name: Android-Projekt auf SDK 36 aktualisieren
         run: |
           sed -i "s/com.android.application' version '[^']*'/com.android.application' version '8.10.1'/" pip-src/build.gradle
