@@ -36,13 +36,10 @@ jobs:
       - name: Sherpa-ONNX laden
         run: |
           mkdir -p pip-src/app/libs
-          wget -q --show-progress --tries=5 --timeout=60 -O pip-src/app/libs/sherpa-onnx-1.13.7.aar "https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.7/sherpa-onnx-1.13.7.aar"
+          wget -q --show-progress --tries=5 --timeout=60 \
+            -O pip-src/app/libs/sherpa-onnx-1.13.7.aar \
+            "https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.7/sherpa-onnx-1.13.7.aar"
           test -s pip-src/app/libs/sherpa-onnx-1.13.7.aar
-
-      - name: Android-Projekt auf SDK 36 aktualisieren
-        run: |
-          sed -i 's/com.android.application.*$/com.android.application/' pip-src/app/build.gradle
-          sed -i 's/compileSdk 35/compileSdk 36/' pip-src/app/build.gradle
 
       - name: Pip APK bauen
         run: gradle -p pip-src assembleDebug --no-daemon
