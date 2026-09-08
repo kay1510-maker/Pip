@@ -32,7 +32,7 @@ jobs:
       - name: Pip-Projekt aus ZIP entpacken
         run: |
           mkdir pip-src
-          unzip -q Pip-v3-Gemma-Sprachbasis-Projekt.zip -d pip-src
+          unzip -q Pip-v3.1-Gemma-Sprachbasis-korrigiert.zip -d pip-src
 
       - name: Android-Projekt auf SDK 36 aktualisieren
         run: |
