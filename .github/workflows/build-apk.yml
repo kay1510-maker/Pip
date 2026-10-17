@@ -77,10 +77,6 @@ jobs:
               raise SystemExit("Persönlichkeits-Satz nicht gefunden; Änderung abgebrochen, damit nichts Falsches ersetzt wird.")
           p.write_text(s.replace(old, new, 1), encoding="utf-8")
           print("Pip-Persönlichkeit auf natürliches, emotionales, verspieltes Deutsch und gut sprechbare Antworten abgestimmt.")
-          if old not in s:
-              raise SystemExit("Persönlichkeits-Satz nicht gefunden; Änderung abgebrochen, damit nichts Falsches ersetzt wird.")
-          p.write_text(s.replace(old, new, 1), encoding="utf-8")
-          print("Pip-Persönlichkeit aktualisiert: FSK-18-Themen bei ausdrücklicher Anfrage offen und passend beantworten.")
           PY
 
       - name: Modellinitialisierung und Antworten serialisieren
