@@ -55,6 +55,7 @@ import androidx.core.app.NotificationCompat
 class PipListeningService : Service() {
     private var recognizer: SpeechRecognizer? = null
     private var launching = false
+    private var stopped = false
     private val channelId = "pip_voice_listening"
 
     override fun onCreate() {
@@ -84,7 +85,7 @@ class PipListeningService : Service() {
     }
 
     private fun listen() {
-        if (launching || isDestroyed) return
+        if (launching || stopped) return
         if (!SpeechRecognizer.isRecognitionAvailable(this)) { stopSelf(); return }
         try {
             recognizer?.destroy()
@@ -132,6 +133,7 @@ class PipListeningService : Service() {
     }
 
     override fun onDestroy() {
+        stopped = true
         recognizer?.destroy(); recognizer = null
         super.onDestroy()
     }
