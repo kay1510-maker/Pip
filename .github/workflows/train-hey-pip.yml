@@ -1,0 +1,47 @@
+name: Train free Hey Pip wakeword
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/train-hey-pip.yml"
+  workflow_dispatch:
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Heed installieren
+        run: python -m pip install --upgrade pip "heed-wakeword[tts,export]"
+
+      - name: Modellprojekt erstellen
+        run: heed init hey_pip --phrase "hey pip"
+
+      - name: TTS-Stimme herunterladen
+        run: heed download-tts
+
+      - name: Hey-Pip-Modell trainieren
+        run: heed train hey_pip --epochs 25 --tts-pos 250
+
+      - name: Modell exportieren und prüfen
+        run: |
+          heed export hey_pip
+          test -s hey_pip/export/wake.onnx
+          test -s hey_pip/export/wake.int8.onnx
+          test -s hey_pip/export/wake.json
+          ls -lh hey_pip/export
+
+      - name: Hey-Pip-Modell als Artefakt speichern
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hey-Pip-Wakeword-Model
+          path: hey_pip/export/
+          if-no-files-found: error
+          retention-days: 90
