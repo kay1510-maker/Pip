@@ -284,6 +284,13 @@ replace_once(
     "Supertonic-Rückkehr",
 )
 
+# Stop active speech recognition before local model inference to avoid concurrent microphone/model resource pressure.
+replace_once(
+    "    private fun ask(text: String) {\\n        val q = text.trim()",
+    "    private fun ask(text: String) {\\n        try { recognizer?.cancel(); recognizer?.destroy() } catch (_: Throwable) { }\\n        recognizer = null\\n        val q = text.trim()",
+    "Spracherkennung vor Inferenz beenden",
+)
+
 # Reduce peak memory pressure during local inference, a likely cause of process death after sending a message.
 for old, new in (
     ("LlamaConfig(contextSize = 512, threads = 6)", "LlamaConfig(contextSize = 256, threads = 4)"),
