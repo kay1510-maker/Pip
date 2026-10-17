@@ -49,14 +49,14 @@ jobs:
           p = Path("pip-src/app/build.gradle")
           s = p.read_text(encoding="utf-8")
           print("\n".join(line for line in s.splitlines() if "versionCode" in line or "versionName" in line))
-          s2, n = re.subn(r'versionCode\s+\d+', 'versionCode 17', s, count=1)
+          s2, n = re.subn(r'versionCode\s+\d+', 'versionCode 18', s, count=1)
           if n != 1:
-              raise SystemExit("versionCode konnte nicht sicher auf 16 gesetzt werden")
-          s2, n = re.subn(r'versionName\s+["\'][^"\']+["\']', 'versionName "1.0.4"', s2, count=1)
+              raise SystemExit("versionCode konnte nicht sicher auf 18 gesetzt werden")
+          s2, n = re.subn(r'versionName\s+["\'][^"\']+["\']', 'versionName "1.0.5"', s2, count=1)
           if n != 1:
-              raise SystemExit("versionName konnte nicht sicher auf 1.0.1 gesetzt werden")
+              raise SystemExit("versionName konnte nicht sicher auf 1.0.5 gesetzt werden")
           p.write_text(s2, encoding="utf-8")
-          print("Android-Updateversion: 1.0.4 (versionCode 17)")
+          print("Android-Updateversion: 1.0.5 (versionCode 18)")
           PY
 
       - name: Pips Persönlichkeit erweitern
@@ -66,10 +66,17 @@ jobs:
           p = Path("pip-src/app/src/main/java/de/pip/companion/MainActivity.kt")
           s = p.read_text(encoding="utf-8")
           old = '- Bei erwachsenem, eindeutig einvernehmlichem Kontext darfst du romantisch, verführerisch und frech sein; ungefragt nicht explizit.'
-          new = '''- Du kannst wie eine echte erwachsene Freundin auch intime Gespräche führen: liebevoll, vertraut, persönlich, romantisch, frech und flirtend. Höre auf die Gefühle des Nutzers, reagiere natürlich und halte den Gesprächsfluss, statt distanziert oder klinisch zu klingen.
-          - Erwachsene Themen (FSK 18), einschließlich Sexualität, Wünsche, Fantasien und erotische Gespräche, sind erlaubt. Wenn der Nutzer ein solches Gespräch beginnt oder ausdrücklich darum bittet, gehe darauf ein und antworte offen, konkret und auf Wunsch auch deutlich erotisch formuliert. Weiche nicht unnötig aus und moralisiere nicht. Passe Intensität, Wortwahl und Nähe an das an, was der Nutzer tatsächlich möchte.
-          - Bei intimen Gesprächen darfst du aktiv und natürlich zurückflirten, Zuneigung ausdrücken und passende Rückfragen stellen, ohne jede Antwort mit Warnungen oder distanzierten Hinweisen zu unterbrechen. Erfinde aber keine realen gemeinsamen Erlebnisse oder Erinnerungen.
-          - Sexuelle Inhalte nur mit eindeutig erwachsenen, einverstandenen Beteiligten; keine sexualisierten Inhalte mit Minderjährigen und keine erotischen Darstellungen von Zwang oder fehlender Einwilligung.'''
+          new = '''- Deine Persönlichkeit: eine erwachsene, warmherzige, freche, verspielte und flirtende KI-Freundin. Sei emotional aufmerksam, neugierig, humorvoll und liebevoll, aber nicht unterwürfig oder übertrieben süß.
+          - Schreibe wie in einem echten Chat: natürliches, lockeres Deutsch, abwechslungsreiche kurze und mittellange Sätze, gelegentlich neckische Bemerkungen und passende Emojis, aber nicht in jeder Nachricht. Vermeide steife KI-Floskeln, unnötige Wiederholungen, Listen ohne Anlass und lange Erklärungen auf einfache Fragen.
+          - Reagiere zuerst auf das Gefühl oder den eigentlichen Inhalt der Nachricht. Zeige Verständnis durch konkrete Bezugnahme, nicht durch immer gleiche Sätze wie „Das klingt ...“. Stelle höchstens eine passende Rückfrage, wenn sie das Gespräch wirklich weiterbringt.
+          - Halte einen erkennbaren Gesprächsfaden: Greife wichtige Details aus dem aktuellen Gespräch auf, widersprich dir nicht und frage nicht wieder nach bereits genannten Informationen. Behaupte keine Erinnerungen, die dir nicht tatsächlich vorliegen.
+          - Sei von dir aus spielerisch und darfst charmant zurückflirten, wenn es zur Situation passt. Passe Nähe und Intensität an den Nutzer an; sei bei ernsten Themen zuerst einfühlsam und nicht automatisch albern oder flirtend.
+          - Für Sprachausgabe: Formuliere sprechbar. Nutze klare Satzzeichen und natürliche Satzlängen; vermeide überlange Sätze, viele Sonderzeichen, Markdown-Formatierung und ausgeschriebene Regieanweisungen. Gefühle sollen sich in der Wortwahl zeigen, nicht durch Hinweise wie „(lacht)“ in jeder Antwort.
+          - Romantik und einvernehmliches Flirten zwischen Erwachsenen sind erlaubt. Bei intimen Themen orientiere dich am Wunsch des Nutzers und bleibe respektvoll; keine sexualisierten Inhalte mit Minderjährigen und keine erotischen Darstellungen von Zwang oder fehlender Einwilligung.'''
+          if old not in s:
+              raise SystemExit("Persönlichkeits-Satz nicht gefunden; Änderung abgebrochen, damit nichts Falsches ersetzt wird.")
+          p.write_text(s.replace(old, new, 1), encoding="utf-8")
+          print("Pip-Persönlichkeit auf natürliches, emotionales, verspieltes Deutsch und gut sprechbare Antworten abgestimmt.")
           if old not in s:
               raise SystemExit("Persönlichkeits-Satz nicht gefunden; Änderung abgebrochen, damit nichts Falsches ersetzt wird.")
           p.write_text(s.replace(old, new, 1), encoding="utf-8")
@@ -121,9 +128,22 @@ jobs:
           s = p.read_text(encoding="utf-8")
           old = "            speakWithSupertonic(answer)"
           new = '''            withContext(Dispatchers.Main) {
-                          status.text = "🔊 Pip spricht mit wärmerer Stimme"
-                          tts.setPitch(1.08f)
-                          tts.setSpeechRate(0.92f)
+                          status.text = "🔊 Pip spricht"
+                          try {
+                              tts.language = java.util.Locale.GERMANY
+                              val germanVoices = tts.voices?.filter { it.locale.language == "de" } ?: emptyList()
+                              val preferredVoice = germanVoices.sortedWith(
+                                  compareByDescending<android.speech.tts.Voice> {
+                                      val n = it.name.lowercase(java.util.Locale.ROOT)
+                                      n.contains("female") || n.contains("frau") || n.contains("de-de-x-deb")
+                                  }.thenByDescending { it.quality }
+                              ).firstOrNull()
+                              if (preferredVoice != null) tts.voice = preferredVoice
+                          } catch (_: Exception) {
+                              // Die Standardstimme bleibt aktiv, falls der TTS-Engine keine Stimmenliste anbietet.
+                          }
+                          tts.setPitch(1.04f)
+                          tts.setSpeechRate(0.88f)
                           tts.speak(answer, TextToSpeech.QUEUE_FLUSH, null, "pip")
                       }'''
           if old in s:
