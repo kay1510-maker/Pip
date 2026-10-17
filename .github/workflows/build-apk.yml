@@ -135,6 +135,36 @@ jobs:
           print("ONNX Runtime Android und Hey-Pip-Modell sind im APK-Projekt vorbereitet.")
           PY
 
+      - name: Doppelte ONNX-Nativbibliothek auflösen
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("pip-src/app/build.gradle")
+          s = p.read_text()
+          block = """
+          android {
+              packaging {
+                  jniLibs {
+                      pickFirsts += [
+                          'lib/arm64-v8a/libonnxruntime.so',
+                          'lib/armeabi-v7a/libonnxruntime.so',
+                          'lib/x86/libonnxruntime.so',
+                          'lib/x86_64/libonnxruntime.so'
+                      ]
+                  }
+              }
+          }
+          """
+          if "pickFirsts += [" not in s:
+              # Insert packaging configuration into the existing android block.
+              marker = "    compileOptions {"
+              if marker not in s:
+                  raise SystemExit("Android-Block nicht gefunden")
+              s = s.replace(marker, block + "\\n" + marker, 1)
+          p.write_text(s)
+          print("Gradle löst doppelte libonnxruntime.so-Dateien über pickFirsts auf.")
+          PY
+
       - name: Fehlende Sherpa-ONNX-Bibliothek ergänzen
         run: |
           mkdir -p pip-src/app/libs
