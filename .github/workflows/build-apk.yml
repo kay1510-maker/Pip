@@ -3,7 +3,7 @@ name: Build Pip APK
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, experiment-qwen-1-5b]
   pull_request:
     branches: [main]
 
@@ -49,14 +49,14 @@ jobs:
           p = Path("pip-src/app/build.gradle")
           s = p.read_text(encoding="utf-8")
           print("\n".join(line for line in s.splitlines() if "versionCode" in line or "versionName" in line))
-          s2, n = re.subn(r'versionCode\s+\d+', 'versionCode 19', s, count=1)
+          s2, n = re.subn(r'versionCode\s+\d+', 'versionCode 20', s, count=1)
           if n != 1:
               raise SystemExit("versionCode konnte nicht sicher auf 18 gesetzt werden")
-          s2, n = re.subn(r'versionName\s+["\'][^"\']+["\']', 'versionName "1.0.6"', s2, count=1)
+          s2, n = re.subn(r'versionName\s+["\'][^"\']+["\']', 'versionName "1.0.7"', s2, count=1)
           if n != 1:
               raise SystemExit("versionName konnte nicht sicher auf 1.0.5 gesetzt werden")
           p.write_text(s2, encoding="utf-8")
-          print("Android-Updateversion: 1.0.6 (versionCode 19)")
+          print("Experiment: Qwen 1.5B (versionCode 20, versionName 1.0.7)")
           PY
 
       - name: Pips Persönlichkeit erweitern
@@ -167,12 +167,7 @@ jobs:
           p = Path("pip-src/app/src/main/java/de/pip/companion/MainActivity.kt")
           s = p.read_text(encoding="utf-8")
           replacements = [
-              ('qwen2.5-1.5b-instruct-q4_k_m.gguf', 'qwen2.5-0.5b-instruct-q4_k_m.gguf'),
-              ('https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf?download=true', 'https://huggingface.co/bartowski/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/Qwen2.5-0.5B-Instruct-Q4_K_M.gguf?download=true'),
-              ('file.length() < 1_000_000_000L', 'file.length() < 250_000_000L'),
               ('val temp = File(file.parentFile, file.name + ".part")', 'val temp = File(file.parentFile, file.name + ".part")'),
-              ('⬇️ Qwen 1.5B wird sicher neu geladen …', '⬇️ Qwen 0.5B wird sicher neu geladen …'),
-              ('Qwen 1.5B wird einmalig geladen (ca. 1,1 GB)', 'Qwen 0.5B wird einmalig geladen (ca. 400 MB)'),
           ]
           for old, new in replacements:
               if old not in s:
