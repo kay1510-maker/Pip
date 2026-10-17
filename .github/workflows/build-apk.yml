@@ -111,6 +111,30 @@ jobs:
           echo "=== Wakeword-/Modell-Referenzen ==="
           grep -RniE 'wake.?word|hey pip|VoiceInteractionService|sherpa|supertonic|qwen|gguf|model.*download|SpeechRecognizer|TextToSpeech' pip-src/app/src 2>/dev/null | head -n 240 || true
 
+      - name: Hey-Pip-Wakeword-Modell einbinden
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p pip-src/app/src/main/assets/hey_pip
+          curl --fail --silent --show-error -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/runs/39036989071/artifacts" -o /tmp/artifacts.json
+          ARTIFACT_ID="$(python3 -c 'import json; d=json.load(open("/tmp/artifacts.json")); print(next(a["id"] for a in d["artifacts"] if a["name"]=="Hey-Pip-Wakeword-Model"))')"
+          curl --fail --location --retry 3 -H "Authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID/zip" -o /tmp/hey-pip.zip
+          unzip -oq /tmp/hey-pip.zip -d pip-src/app/src/main/assets/hey_pip
+          test -s pip-src/app/src/main/assets/hey_pip/wake.int8.onnx
+          test -s pip-src/app/src/main/assets/hey_pip/wake.json
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("pip-src/app/build.gradle")
+          s = p.read_text()
+          dep = "    implementation 'com.microsoft.onnxruntime:onnxruntime-android:1.20.0'\n"
+          if dep.strip() not in s:
+              s = s.replace("dependencies {\n", "dependencies {\n" + dep, 1)
+          p.write_text(s)
+          print("ONNX Runtime Android und Hey-Pip-Modell sind im APK-Projekt vorbereitet.")
+          PY
+
       - name: Fehlende Sherpa-ONNX-Bibliothek ergänzen
         run: |
           mkdir -p pip-src/app/libs
