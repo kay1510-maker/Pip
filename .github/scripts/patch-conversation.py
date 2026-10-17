@@ -346,7 +346,7 @@ replace_once(
 
 # Reduce peak memory pressure during local inference, a likely cause of process death after sending a message.
 for old, new in (
-    ("LlamaConfig(contextSize = 512, threads = 6)", "LlamaConfig(contextSize = 1024, threads = 4)"),
+    ("LlamaConfig(contextSize = 512, threads = 6)", "LlamaConfig(contextSize = 256, threads = 4)"),
     ("maxTokens = 64", "maxTokens = 48"),
 ):
     if old not in s:
@@ -361,7 +361,7 @@ replace_once(
         }
         withContext(Dispatchers.Main) { status.text = "🧠 Pip lädt ihr Gehirn …" }
         try {
-            model = Llama.loadModel(file.absolutePath, LlamaConfig(contextSize = 256, threads = 4))""",
+            model = Llama.loadModel(file.absolutePath, LlamaConfig(contextSize = 1024, threads = 4))""",
     """        if (!isValidGguf(file)) {
             file.delete()
             withContext(Dispatchers.Main) { status.text = "⬇️ Qwen 1.5B wird sicher neu geladen …" }
