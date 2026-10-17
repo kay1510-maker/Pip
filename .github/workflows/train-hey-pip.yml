@@ -26,6 +26,12 @@ jobs:
       - name: TTS-Stimme herunterladen
         run: heed download-tts
 
+      - name: Positive Sprachprobe erzeugen
+        run: |
+          mkdir -p hey_pip/positive
+          printf 'hey pip\n' | piper --model "$HOME/.heed/voices/en_US-libritts_r-medium.onnx" --output_file hey_pip/positive/hey_pip.wav
+          test -s hey_pip/positive/hey_pip.wav
+
       - name: Hey-Pip-Modell trainieren
         run: heed train hey_pip --epochs 25 --tts-pos 250
 
