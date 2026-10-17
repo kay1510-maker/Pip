@@ -25,7 +25,7 @@ for perm in (
     '    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />',
 ):
     if perm not in ms:
-        ms = ms.replace('    <uses-permission android:name="android.permission.RECORD_AUDIO" />', '    <uses-permission android:name="android.permission.RECORD_AUDIO" />\\n' + perm, 1)
+        ms = ms.replace('    <uses-permission android:name="android.permission.RECORD_AUDIO" />', '    <uses-permission android:name="android.permission.RECORD_AUDIO" />' + chr(10) + perm, 1)
 service_decl = '''        <service
             android:name=".PipListeningService"
             android:exported="false"
@@ -138,6 +138,32 @@ class PipListeningService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 }
 ''', encoding="utf-8")
+
+# Hand off listening to the foreground service when the activity leaves the screen.
+replace_once(
+    "    private fun buildUi() {",
+    """    override fun onPause() {
+        super.onPause()
+        if (!isFinishing && ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+            recognizer?.destroy(); recognizer = null
+            try {
+                val intent = Intent(this, PipListeningService::class.java)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent) else startService(intent)
+            } catch (_: Throwable) { }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        stopService(Intent(this, PipListeningService::class.java))
+        if (::output.isInitialized && ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+            Handler(Looper.getMainLooper()).postDelayed({ if (!isFinishing && !isDestroyed) startListening() }, 700)
+        }
+    }
+
+    private fun buildUi() {""",
+    "Lifecycle Übergabe an Hintergrunddienst",
+)
 
 # Session state.
 replace_once(
