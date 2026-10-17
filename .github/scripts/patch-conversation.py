@@ -311,10 +311,19 @@ replace_once(
                     android.app.ApplicationExitInfo.REASON_ANR -> "Pip reagierte zu lange nicht (ANR)"
                     else -> "Unbekannter Grund"
                 }
+                val trace = try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        previous.traceInputStream?.bufferedReader()?.use { it.readText().take(3500) }.orEmpty()
+                    } else ""
+                } catch (_: Throwable) { "" }
                 android.app.AlertDialog.Builder(this)
                     .setTitle("Pip-Absturzdiagnose")
-                    .setMessage("Android hat für einen vorherigen Start Folgendes gespeichert: $reason\\n\\nExit-Code: ${previous.status}; Zeit: ${java.text.SimpleDateFormat("dd.MM. HH:mm:ss", java.util.Locale.GERMANY).format(java.util.Date(previous.timestamp))}\\n\\nBitte teile mir diesen Grund mit. So können wir die nächste Änderung gezielt wählen.")
+                    .setMessage("Android hat gespeichert: $reason\\n\\nExit-Code: ${previous.status}; Zeit: ${java.text.SimpleDateFormat("dd.MM. HH:mm:ss", java.util.Locale.GERMANY).format(java.util.Date(previous.timestamp))}\\n\\nNative Trace (falls vorhanden):\\n${trace.ifBlank { "Kein Trace verfügbar" }}")
                     .setPositiveButton("OK", null)
+                    .setNeutralButton("Trace kopieren") { _, _ ->
+                        val clipboard = getSystemService(android.content.ClipboardManager::class.java)
+                        clipboard?.setPrimaryClip(android.content.ClipData.newPlainText("Pip crash trace", trace.ifBlank { reason + " / Exit-Code " + previous.status }))
+                    }
                     .show()
             }
         } catch (_: Throwable) { }
