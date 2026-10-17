@@ -163,6 +163,39 @@ jobs:
           print("Supertonic-Initialisierung wird für die Antwort umgangen; Android-TTS übernimmt.")
           PY
 
+      - name: Supertonic sicher aktivieren und Speicherlast begrenzen
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("pip-src/app/src/main/java/de/pip/companion/MainActivity.kt")
+          s = p.read_text(encoding="utf-8")
+          # In the main reply path, use Supertonic; its own guarded function falls back to Android TTS.
+          old = 'withContext(Dispatchers.Main) { tts.speak(answer, TextToSpeech.QUEUE_FLUSH, null, "pip") }'
+          new = 'speakWithSupertonic(displayAnswer)'
+          if old not in s:
+              raise SystemExit("Abbruch: Antwort-Ausgabestelle nicht gefunden; nichts geändert.")
+          s = s.replace(old, new, 1)
+          # Keep native inference light and limit sentence/audio allocations on mobile.
+          old_threads = "                numThreads = 4,"
+          if old_threads not in s:
+              raise SystemExit("Abbruch: Supertonic-Thread-Konfiguration nicht gefunden.")
+          s = s.replace(old_threads, "                numThreads = 2,", 1)
+          old_cfg = "        val config = OfflineTtsConfig(\n            model = OfflineTtsModelConfig("
+          new_cfg = "        val config = OfflineTtsConfig(\n            maxNumSentences = 1,\n            model = OfflineTtsModelConfig("
+          if old_cfg not in s:
+              raise SystemExit("Abbruch: OfflineTtsConfig-Stelle nicht gefunden.")
+          s = s.replace(old_cfg, new_cfg, 1)
+          # Avoid extreme allocations from unexpectedly long model output.
+          old_gen = '            val gen = GenerationConfig(sid = 0, speed = 1.05f, numSteps = 8, extra = mapOf("lang" to "de"))'
+          new_gen = '            val speechText = text.replace(Regex("\\s+"), " ").trim().take(240)\n            val gen = GenerationConfig(sid = 0, speed = 1.0f, numSteps = 8, extra = mapOf("lang" to "de"))'
+          if old_gen not in s:
+              raise SystemExit("Abbruch: GenerationConfig-Stelle nicht gefunden.")
+          s = s.replace(old_gen, new_gen, 1)
+          s = s.replace("engine.generateWithConfigAndCallback(text, gen)", "engine.generateWithConfigAndCallback(speechText, gen)", 1)
+          p.write_text(s, encoding="utf-8")
+          print("Supertonic wird für Antworten verwendet; CPU-Threads, Satzanzahl und Textlänge sind begrenzt.")
+          PY
+
       - name: Lokales KI-Modell verkleinern und native Speicherlast senken
         run: |
           python3 - <<'PY'
