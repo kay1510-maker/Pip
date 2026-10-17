@@ -49,14 +49,14 @@ jobs:
           p = Path("pip-src/app/build.gradle")
           s = p.read_text(encoding="utf-8")
           print("\n".join(line for line in s.splitlines() if "versionCode" in line or "versionName" in line))
-          s2, n = re.subn(r'versionCode\s+\d+', 'versionCode 18', s, count=1)
+          s2, n = re.subn(r'versionCode\s+\d+', 'versionCode 19', s, count=1)
           if n != 1:
               raise SystemExit("versionCode konnte nicht sicher auf 18 gesetzt werden")
-          s2, n = re.subn(r'versionName\s+["\'][^"\']+["\']', 'versionName "1.0.5"', s2, count=1)
+          s2, n = re.subn(r'versionName\s+["\'][^"\']+["\']', 'versionName "1.0.6"', s2, count=1)
           if n != 1:
               raise SystemExit("versionName konnte nicht sicher auf 1.0.5 gesetzt werden")
           p.write_text(s2, encoding="utf-8")
-          print("Android-Updateversion: 1.0.5 (versionCode 18)")
+          print("Android-Updateversion: 1.0.6 (versionCode 19)")
           PY
 
       - name: Pips Persönlichkeit erweitern
@@ -131,19 +131,26 @@ jobs:
                           status.text = "🔊 Pip spricht"
                           try {
                               tts.language = java.util.Locale.GERMANY
-                              val germanVoices = tts.voices?.filter { it.locale.language == "de" } ?: emptyList()
+                              val germanVoices = tts.voices?.filter {
+                                  it.locale.language == "de" && it.locale.country.equals("DE", ignoreCase = true)
+                              } ?: emptyList()
+                              // Qualität zuerst: Ein künstlich klingender Low-Quality-Treffer darf nicht
+                              // nur wegen eines Namensmusters vor einer besseren deutschen Stimme landen.
                               val preferredVoice = germanVoices.sortedWith(
-                                  compareByDescending<android.speech.tts.Voice> {
-                                      val n = it.name.lowercase(java.util.Locale.ROOT)
-                                      n.contains("female") || n.contains("frau") || n.contains("de-de-x-deb")
-                                  }.thenByDescending { it.quality }
-                              ).firstOrNull()
+                                  compareByDescending<android.speech.tts.Voice> { it.quality }
+                                      .thenBy { it.latency }
+                                      .thenByDescending {
+                                          val n = it.name.lowercase(java.util.Locale.ROOT)
+                                          if (n.contains("female") || n.contains("frau") || n.contains("de-de-x-deb")) 1 else 0
+                                      }
+                              ).firstOrNull() ?: tts.voices?.filter { it.locale.language == "de" }
+                                  ?.maxByOrNull { it.quality }
                               if (preferredVoice != null) tts.voice = preferredVoice
                           } catch (_: Exception) {
                               // Die Standardstimme bleibt aktiv, falls der TTS-Engine keine Stimmenliste anbietet.
                           }
-                          tts.setPitch(1.04f)
-                          tts.setSpeechRate(0.88f)
+                          tts.setPitch(1.0f)
+                          tts.setSpeechRate(0.90f)
                           tts.speak(answer, TextToSpeech.QUEUE_FLUSH, null, "pip")
                       }'''
           if old in s:
