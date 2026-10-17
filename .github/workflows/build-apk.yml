@@ -49,14 +49,14 @@ jobs:
           p = Path("pip-src/app/build.gradle")
           s = p.read_text(encoding="utf-8")
           print("\n".join(line for line in s.splitlines() if "versionCode" in line or "versionName" in line))
-          s2, n = re.subn(r'versionCode\s+\d+', 'versionCode 16', s, count=1)
+          s2, n = re.subn(r'versionCode\s+\d+', 'versionCode 17', s, count=1)
           if n != 1:
               raise SystemExit("versionCode konnte nicht sicher auf 16 gesetzt werden")
-          s2, n = re.subn(r'versionName\s+["\'][^"\']+["\']', 'versionName "1.0.3"', s2, count=1)
+          s2, n = re.subn(r'versionName\s+["\'][^"\']+["\']', 'versionName "1.0.4"', s2, count=1)
           if n != 1:
               raise SystemExit("versionName konnte nicht sicher auf 1.0.1 gesetzt werden")
           p.write_text(s2, encoding="utf-8")
-          print("Android-Updateversion: 1.0.3 (versionCode 16)")
+          print("Android-Updateversion: 1.0.4 (versionCode 17)")
           PY
 
       - name: Pips Persönlichkeit erweitern
@@ -121,7 +121,9 @@ jobs:
           s = p.read_text(encoding="utf-8")
           old = "            speakWithSupertonic(answer)"
           new = '''            withContext(Dispatchers.Main) {
-                          status.text = "🔊 Pip spricht mit der Android-Stimme"
+                          status.text = "🔊 Pip spricht mit wärmerer Stimme"
+                          tts.setPitch(1.08f)
+                          tts.setSpeechRate(0.92f)
                           tts.speak(answer, TextToSpeech.QUEUE_FLUSH, null, "pip")
                       }'''
           if old in s:
