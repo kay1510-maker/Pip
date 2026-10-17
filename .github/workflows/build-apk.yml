@@ -41,6 +41,23 @@ jobs:
           mkdir -p pip-src
           unzip -q Pip-v4.9-Qwen-1.5B-Supertonic.zip -d pip-src
 
+      - name: App-Version für Android-Update erhöhen
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p = Path("pip-src/app/build.gradle")
+          s = p.read_text(encoding="utf-8")
+          s2, n = re.subn(r'versionCode\\s+\\d+', 'versionCode 14', s, count=1)
+          if n != 1:
+              raise SystemExit("versionCode konnte nicht sicher auf 14 gesetzt werden")
+          s2, n = re.subn(r'versionName\\s+"[^"]+"', 'versionName "1.0.1"', s2, count=1)
+          if n != 1:
+              raise SystemExit("versionName konnte nicht sicher auf 1.0.1 gesetzt werden")
+          p.write_text(s2, encoding="utf-8")
+          print("Android-Updateversion: 1.0.1 (versionCode 14)")
+          PY
+
       - name: Pips Persönlichkeit erweitern
         run: |
           python3 - <<'PY'
