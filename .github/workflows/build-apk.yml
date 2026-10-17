@@ -92,6 +92,149 @@ jobs:
           print("Modellinitialisierung und Inferenz werden gegen parallele Aufrufe geschützt.")
           PY
 
+      - name: Hey-Pip-Erkennung im Vordergrund aktivieren
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("pip-src/app/src/main/java/de/pip/companion/MainActivity.kt")
+          s = p.read_text(encoding="utf-8")
+          s = s.replace(
+              "    private var recognizer: SpeechRecognizer? = null\n",
+              "    private var recognizer: SpeechRecognizer? = null\n    private var wakewordActive = false\n    private val wakeHandler = Handler(Looper.getMainLooper())\n",
+              1
+          )
+          old = """        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+              != PackageManager.PERMISSION_GRANTED) {
+              ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.RECORD_AUDIO), 10)
+          }
+"""
+          new = """        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+              != PackageManager.PERMISSION_GRANTED) {
+              ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.RECORD_AUDIO), 10)
+          } else {
+              wakeHandler.postDelayed({ startWakewordListening() }, 900)
+          }
+"""
+          if old not in s: raise SystemExit("onCreate-Berechtigungsblock nicht gefunden")
+          s = s.replace(old, new, 1)
+          # Start/resume listening after the permission dialog returns.
+          marker = "    private fun buildUi() {"
+          resume = """    override fun onResume() {
+          super.onResume()
+          if (::status.isInitialized &&
+              ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+              wakeHandler.postDelayed({ startWakewordListening() }, 700)
+          }
+      }
+
+      private fun startWakewordListening() {
+          if (isFinishing || isDestroyed ||
+              ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) return
+          if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+              status.text = "Hey-Pip-Erkennung benötigt die Android-Spracherkennung."
+              return
+          }
+          wakewordActive = true
+          try {
+              recognizer?.destroy()
+              recognizer = if (Build.VERSION.SDK_INT >= 31 && SpeechRecognizer.isOnDeviceRecognitionAvailable(this)) {
+                  SpeechRecognizer.createOnDeviceSpeechRecognizer(this)
+              } else {
+                  SpeechRecognizer.createSpeechRecognizer(this)
+              }
+              recognizer?.setRecognitionListener(object : RecognitionListener {
+                  override fun onReadyForSpeech(p: Bundle?) {
+                      if (wakewordActive) status.text = "🎧 Sag „Hey Pip“, um mit mir zu sprechen."
+                  }
+                  override fun onResults(b: Bundle?) {
+                      if (!wakewordActive) return
+                      val heard = b?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull().orEmpty()
+                      val normalized = heard.lowercase(Locale.GERMAN)
+                          .replace(Regex("[^a-zäöüß ]"), " ").replace(Regex("\\s+"), " ").trim()
+                      val hit = Regex("\\bhey\\s+p[iy]p\\b").containsMatchIn(normalized) ||
+                          Regex("\\bhei\\s+p[iy]p\\b").containsMatchIn(normalized)
+                      if (hit) {
+                          wakewordActive = false
+                          recognizer?.cancel()
+                          val rest = normalized.replaceFirst(Regex("^.*?\\b(?:hey|hei)\\s+p[iy]p\\b"), "").trim()
+                          if (rest.isNotBlank()) {
+                              input.setText(rest)
+                              ask(rest)
+                          } else {
+                              output.text = "Ja? ❤️ Ich höre dir zu."
+                              tts.speak("Ja? Ich höre dir zu.", TextToSpeech.QUEUE_FLUSH, null, "pip-wake")
+                              wakeHandler.postDelayed({ startListeningForCommand() }, 1000)
+                          }
+                      } else {
+                          wakeHandler.postDelayed({ startWakewordListening() }, 450)
+                      }
+                  }
+                  override fun onError(e: Int) {
+                      if (wakewordActive) wakeHandler.postDelayed({ startWakewordListening() }, 900)
+                  }
+                  override fun onBeginningOfSpeech() {}
+                  override fun onBufferReceived(b: ByteArray?) {}
+                  override fun onEndOfSpeech() {}
+                  override fun onEvent(t: Int, b: Bundle?) {}
+                  override fun onPartialResults(b: Bundle?) {}
+                  override fun onRmsChanged(v: Float) {}
+              })
+              recognizer?.startListening(Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                  putExtra(RecognizerIntent.EXTRA_LANGUAGE, "de-DE")
+                  putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "de-DE")
+                  putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
+                  putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
+                  putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+              })
+          } catch (_: Throwable) {
+              wakeHandler.postDelayed({ startWakewordListening() }, 1500)
+          }
+      }
+
+      private fun startListeningForCommand() {
+          if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) return
+          try {
+              recognizer?.destroy()
+              recognizer = if (Build.VERSION.SDK_INT >= 31 && SpeechRecognizer.isOnDeviceRecognitionAvailable(this)) {
+                  SpeechRecognizer.createOnDeviceSpeechRecognizer(this)
+              } else SpeechRecognizer.createSpeechRecognizer(this)
+              recognizer?.setRecognitionListener(object : RecognitionListener {
+                  override fun onReadyForSpeech(p: Bundle?) { status.text = "🎤 Ich höre dir zu …" }
+                  override fun onResults(b: Bundle?) {
+                      val heard = b?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull().orEmpty()
+                      if (heard.isNotBlank()) { input.setText(heard); ask(heard) }
+                      else wakeHandler.postDelayed({ startWakewordListening() }, 500)
+                  }
+                  override fun onError(e: Int) { wakeHandler.postDelayed({ startWakewordListening() }, 700) }
+                  override fun onBeginningOfSpeech() {}
+                  override fun onBufferReceived(b: ByteArray?) {}
+                  override fun onEndOfSpeech() {}
+                  override fun onEvent(t: Int, b: Bundle?) {}
+                  override fun onPartialResults(b: Bundle?) {}
+                  override fun onRmsChanged(v: Float) {}
+              })
+              recognizer?.startListening(Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                  putExtra(RecognizerIntent.EXTRA_LANGUAGE, "de-DE")
+                  putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "de-DE")
+                  putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
+                  putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+              })
+          } catch (_: Throwable) {
+              wakeHandler.postDelayed({ startWakewordListening() }, 900)
+          }
+      }
+
+  """
+          if marker not in s: raise SystemExit("UI-Marker nicht gefunden")
+          s = s.replace(marker, resume + marker, 1)
+          # After a response has been spoken, resume wakeword listening.
+          old_speak = "            speakWithSupertonic(answer)\n"
+          if old_speak not in s: raise SystemExit("Sprachausgabe-Stelle nicht gefunden")
+          s = s.replace(old_speak, old_speak + "            wakeHandler.postDelayed({ startWakewordListening() }, 1200)\n", 1)
+          p.write_text(s, encoding="utf-8")
+          print("Foreground-Wakeword-Erkennung per Android-On-Device-Spracherkennung ergänzt.")
+          PY
+
       - name: Pip-Quellcode und Funktionen prüfen
         run: |
           echo "=== Projektdateien ==="
