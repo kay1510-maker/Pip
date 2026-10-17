@@ -92,6 +92,9 @@ jobs:
           print("Modellinitialisierung und Inferenz werden gegen parallele Aufrufe geschützt.")
           PY
 
+      - name: Hey-Pip-Aktivierung und fortlaufendes Gespräch integrieren
+        run: python3 .github/scripts/patch-conversation.py
+
       - name: Pip-Quellcode und Funktionen prüfen
         run: |
           echo "=== Projektdateien ==="
