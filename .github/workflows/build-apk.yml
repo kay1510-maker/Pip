@@ -49,14 +49,14 @@ jobs:
           p = Path("pip-src/app/build.gradle")
           s = p.read_text(encoding="utf-8")
           print("\n".join(line for line in s.splitlines() if "versionCode" in line or "versionName" in line))
-          s2, n = re.subn(r'versionCode\s+\d+', 'versionCode 20', s, count=1)
+          s2, n = re.subn(r'versionCode\s+\d+', 'versionCode 21', s, count=1)
           if n != 1:
               raise SystemExit("versionCode konnte nicht sicher auf 18 gesetzt werden")
-          s2, n = re.subn(r'versionName\s+["\'][^"\']+["\']', 'versionName "1.0.7"', s2, count=1)
+          s2, n = re.subn(r'versionName\s+["\'][^"\']+["\']', 'versionName "1.0.8"', s2, count=1)
           if n != 1:
               raise SystemExit("versionName konnte nicht sicher auf 1.0.5 gesetzt werden")
           p.write_text(s2, encoding="utf-8")
-          print("Experiment: Qwen 1.5B (versionCode 20, versionName 1.0.7)")
+          print("Experiment: Qwen 1.5B personality update (versionCode 21, versionName 1.0.8)")
           PY
 
       - name: Pips Persönlichkeit erweitern
