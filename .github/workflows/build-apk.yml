@@ -148,8 +148,9 @@ jobs:
                           } catch (_: Exception) {
                               // Die Standardstimme bleibt aktiv, falls der TTS-Engine keine Stimmenliste anbietet.
                           }
-                          tts.setPitch(1.06f)
-                          tts.setSpeechRate(0.92f)
+                          // Avoid exaggerated pitch/speed, which can make TTS sound synthetic.
+                          tts.setPitch(1.0f)
+                          tts.setSpeechRate(0.96f)
                           tts.speak(answer, TextToSpeech.QUEUE_FLUSH, null, "pip")
                       }'''
           if old in s:
