@@ -196,28 +196,28 @@ jobs:
           print("Supertonic wird für Antworten verwendet; CPU-Threads, Satzanzahl und Textlänge sind begrenzt.")
           PY
 
-      - name: Lokales KI-Modell verkleinern und native Speicherlast senken
+      - name: Qwen-1.5B-Modell und Speicherprüfung konfigurieren
         run: |
           python3 - <<'PY'
           from pathlib import Path
           p = Path("pip-src/app/src/main/java/de/pip/companion/MainActivity.kt")
           s = p.read_text(encoding="utf-8")
+          # The source archive already contains Qwen 1.5B. Convert the earlier 0.5B
+          # variant back when present, while remaining safe on the 1.5B source.
           replacements = [
               ('qwen2.5-0.5b-instruct-q4_k_m.gguf', 'qwen2.5-1.5b-instruct-q4_k_m.gguf'),
               ('https://huggingface.co/bartowski/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/Qwen2.5-0.5B-Instruct-Q4_K_M.gguf?download=true', 'https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf?download=true'),
-              ('file.length() < 1_500_000_000L', 'file.length() < 1_500_000_000L'),
-              ('val temp = File(file.parentFile, file.name + ".part")', 'val temp = File(file.parentFile, file.name + ".part")'),
+              ('file.length() < 250_000_000L', 'file.length() < 1_500_000_000L'),
               ('⬇️ Qwen 0.5B wird sicher neu geladen …', '⬇️ Qwen 1.5B wird sicher neu geladen …'),
               ('Qwen 0.5B wird einmalig geladen (ca. 400 MB)', 'Qwen 1.5B wird einmalig geladen (ca. 1,1 GB)'),
           ]
           for old, new in replacements:
-              if old not in s:
-                  if old.startswith('Qwen 1.5B wird einmalig'):
-                      continue
-                  raise SystemExit("Abbruch: erwartete Modellstelle fehlt: " + old)
-              s = s.replace(old, new, 1)
+              if old in s:
+                  s = s.replace(old, new, 1)
+          if 'qwen2.5-1.5b-instruct-q4_k_m.gguf' not in s.lower():
+              raise SystemExit("Qwen-1.5B-Modellreferenz fehlt; Build sicher abgebrochen.")
           p.write_text(s, encoding="utf-8")
-          print("Qwen 0.5B gewählt; GGUF-Prüfung und Statusmeldungen angepasst.")
+          print("Qwen 1.5B bleibt aktiv; Downloadprüfung für das größere Modell angepasst.")
           PY
 
       - name: Pip-Quellcode und Funktionen prüfen
