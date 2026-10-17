@@ -133,21 +133,23 @@ jobs:
                               } ?: emptyList()
                               // Qualität zuerst: Ein künstlich klingender Low-Quality-Treffer darf nicht
                               // nur wegen eines Namensmusters vor einer besseren deutschen Stimme landen.
-                              val preferredVoice = germanVoices.sortedWith(
-                                  compareByDescending<android.speech.tts.Voice> { it.quality }
-                                      .thenBy { it.latency }
-                                      .thenByDescending {
-                                          val n = it.name.lowercase(java.util.Locale.ROOT)
-                                          if (n.contains("female") || n.contains("frau") || n.contains("de-de-x-deb")) 1 else 0
-                                      }
-                              ).firstOrNull() ?: tts.voices?.filter { it.locale.language == "de" }
-                                  ?.maxByOrNull { it.quality }
+                              val germanVoicesAll = tts.voices?.filter { it.locale.language == "de" } ?: emptyList()
+                              // Stimme mit weiblichem Profil zuerst auswählen; Qualität ist danach das Kriterium.
+                              val preferredVoice = (germanVoicesAll.filter {
+                                  val n = it.name.lowercase(java.util.Locale.ROOT)
+                                  n.contains("female") || n.contains("frau") ||
+                                      n.contains("de-de-x-deb") || n.contains("de-de-x-") && n.contains("female")
+                              }.ifEmpty { germanVoices })
+                                  .sortedWith(
+                                      compareByDescending<android.speech.tts.Voice> { it.quality }
+                                          .thenBy { it.latency }
+                                  ).firstOrNull() ?: germanVoicesAll.maxByOrNull { it.quality }
                               if (preferredVoice != null) tts.voice = preferredVoice
                           } catch (_: Exception) {
                               // Die Standardstimme bleibt aktiv, falls der TTS-Engine keine Stimmenliste anbietet.
                           }
-                          tts.setPitch(1.0f)
-                          tts.setSpeechRate(0.96f)
+                          tts.setPitch(1.06f)
+                          tts.setSpeechRate(0.92f)
                           tts.speak(answer, TextToSpeech.QUEUE_FLUSH, null, "pip")
                       }'''
           if old in s:
