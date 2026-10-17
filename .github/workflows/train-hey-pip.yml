@@ -28,9 +28,17 @@ jobs:
 
       - name: Positive Sprachprobe erzeugen
         run: |
-          mkdir -p hey_pip/positive
+          mkdir -p hey_pip/positive hey_pip/negative
           printf 'hey pip\n' | piper --model "$HOME/.heed/voices/en_US-libritts_r-medium.onnx" --output_file hey_pip/positive/hey_pip.wav
           test -s hey_pip/positive/hey_pip.wav
+
+      - name: Negative Sprachproben erzeugen
+        run: |
+          for phrase in "hallo du" "guten morgen" "wie geht es dir" "hey baby" "gute nacht" "pip"; do
+            name=$(printf '%s' "$phrase" | tr ' ' '_' )
+            printf '%s\n' "$phrase" | piper --model "$HOME/.heed/voices/en_US-libritts_r-medium.onnx" --output_file "hey_pip/negative/$name.wav"
+          done
+          ls -lh hey_pip/negative
 
       - name: Hey-Pip-Modell trainieren
         run: heed train hey_pip --epochs 25 --tts-pos 250
