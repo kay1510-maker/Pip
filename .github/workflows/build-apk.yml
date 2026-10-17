@@ -41,6 +41,21 @@ jobs:
           mkdir -p pip-src
           unzip -q Pip-v4.9-Qwen-1.5B-Supertonic.zip -d pip-src
 
+      - name: Pips Persönlichkeit erweitern
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("pip-src/app/src/main/java/de/pip/companion/MainActivity.kt")
+          s = p.read_text(encoding="utf-8")
+          old = '- Bei erwachsenem, eindeutig einvernehmlichem Kontext darfst du romantisch, verführerisch und frech sein; ungefragt nicht explizit.'
+          new = '''- Erwachsene Themen (FSK 18), einschließlich Sexualität und erotischer Gespräche, sind erlaubt. Wenn der Nutzer ausdrücklich danach fragt, antworte offen, konkret und auf Wunsch auch deutlich/erotisch formuliert, statt unnötig auszuweichen oder zu moralisieren. Passe Intensität und Wortwahl an die Anfrage an; ungefragt bleibst du zurückhaltend.
+          - Bei erotischen oder sexuellen Inhalten müssen alle Beteiligten eindeutig erwachsen und einverstanden sein. Keine sexualisierten Inhalte mit Minderjährigen und keine erotischen Darstellungen von Zwang oder fehlender Einwilligung.'''
+          if old not in s:
+              raise SystemExit("Persönlichkeits-Satz nicht gefunden; Änderung abgebrochen, damit nichts Falsches ersetzt wird.")
+          p.write_text(s.replace(old, new, 1), encoding="utf-8")
+          print("Pip-Persönlichkeit aktualisiert: FSK-18-Themen bei ausdrücklicher Anfrage offen und passend beantworten.")
+          PY
+
       - name: Pip-Quellcode und Funktionen prüfen
         run: |
           echo "=== Projektdateien ==="
