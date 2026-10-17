@@ -16,6 +16,129 @@ replace_once(
     "Manuellen Mikrofonknopf entfernen",
 )
 
+# Add an explicit microphone foreground service for locked-screen listening.
+manifest = Path("pip-src/app/src/main/AndroidManifest.xml")
+ms = manifest.read_text(encoding="utf-8")
+for perm in (
+    '    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />',
+    '    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />',
+    '    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />',
+):
+    if perm not in ms:
+        ms = ms.replace('    <uses-permission android:name="android.permission.RECORD_AUDIO" />', '    <uses-permission android:name="android.permission.RECORD_AUDIO" />\\n' + perm, 1)
+service_decl = '''        <service
+            android:name=".PipListeningService"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
+'''
+if 'android:name=".PipListeningService"' not in ms:
+    ms = ms.replace('        <activity android:name=".MainActivity"', service_decl + '        <activity android:name=".MainActivity"', 1)
+manifest.write_text(ms, encoding="utf-8")
+service = Path("pip-src/app/src/main/java/de/pip/companion/PipListeningService.kt")
+service.write_text(r'''package de.pip.companion
+
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.app.Service
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
+import android.os.Bundle
+import android.os.IBinder
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
+import androidx.core.app.NotificationCompat
+
+class PipListeningService : Service() {
+    private var recognizer: SpeechRecognizer? = null
+    private var launching = false
+    private val channelId = "pip_voice_listening"
+
+    override fun onCreate() {
+        super.onCreate()
+        createChannel()
+        val open = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            putExtra("pip_wakeword", true)
+        }, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val notification: Notification = NotificationCompat.Builder(this, channelId)
+            .setSmallIcon(android.R.drawable.ic_btn_speak_now)
+            .setContentTitle("Pip hört auf Hey Pip")
+            .setContentText("Mikrofon aktiv – tippe hier, um Pip zu öffnen")
+            .setContentIntent(open)
+            .setOngoing(true)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .build()
+        startForeground(713, notification)
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            stopSelf(); return START_NOT_STICKY
+        }
+        listen()
+        return START_STICKY
+    }
+
+    private fun listen() {
+        if (launching || isDestroyed) return
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) { stopSelf(); return }
+        try {
+            recognizer?.destroy()
+            recognizer = SpeechRecognizer.createOnDeviceSpeechRecognizer(this).apply {
+                setRecognitionListener(object : RecognitionListener {
+                    override fun onReadyForSpeech(params: Bundle?) {}
+                    override fun onBeginningOfSpeech() {}
+                    override fun onRmsChanged(rmsdB: Float) {}
+                    override fun onBufferReceived(buffer: ByteArray?) {}
+                    override fun onEndOfSpeech() {}
+                    override fun onError(error: Int) { if (!launching) listenAgain() }
+                    override fun onResults(results: Bundle?) {
+                        val words = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull().orEmpty().lowercase()
+                        if (words.contains("hey pip") || words.contains("hei pip")) {
+                            launching = true
+                            val open = Intent(this@PipListeningService, MainActivity::class.java).apply {
+                                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                                putExtra("pip_wakeword", true)
+                            }
+                            try { startActivity(open) } catch (_: Throwable) { }
+                            stopSelf()
+                        } else listenAgain()
+                    }
+                    override fun onPartialResults(partialResults: Bundle?) {}
+                    override fun onEvent(eventType: Int, params: Bundle?) {}
+                })
+                startListening(Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                    putExtra(RecognizerIntent.EXTRA_LANGUAGE, "de-DE")
+                    putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "de-DE")
+                    putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
+                })
+            }
+        } catch (_: Throwable) { listenAgain() }
+    }
+
+    private fun listenAgain() {
+        android.os.Handler(mainLooper).postDelayed({ if (!launching) listen() }, 900)
+    }
+
+    private fun createChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(channelId, "Pip Sprachbereitschaft", NotificationManager.IMPORTANCE_LOW)
+            getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+        }
+    }
+
+    override fun onDestroy() {
+        recognizer?.destroy(); recognizer = null
+        super.onDestroy()
+    }
+    override fun onBind(intent: Intent?): IBinder? = null
+}
+''', encoding="utf-8")
+
 # Session state.
 replace_once(
     "    private var recognizer: SpeechRecognizer? = null\n",
