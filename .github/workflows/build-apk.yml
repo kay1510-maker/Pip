@@ -125,7 +125,7 @@ jobs:
           s = p.read_text(encoding="utf-8")
           old = "            speakWithSupertonic(answer)"
           new = '''            try {
-                          status.text = "🔊 Pip spricht"
+                          withContext(Dispatchers.Main) { status.text = "🔊 Pip spricht" }
                           speakWithSupertonic(answer)
                       } catch (voiceError: Exception) {
                           android.util.Log.e("PipVoice", "Supertonic fehlgeschlagen; nutze Android-TTS als Rückfall", voiceError)
