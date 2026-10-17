@@ -353,5 +353,66 @@ for old, new in (
         raise SystemExit(f"Patch fehlgeschlagen: Modell-Ressourcenstelle nicht gefunden: {old}")
     s = s.replace(old, new, 1)
 
+# Make GGUF download atomic and reject incomplete/non-GGUF files before native code sees them.
+replace_once(
+    """        if (!file.exists() || file.length() < 800_000_000L) {
+            withContext(Dispatchers.Main) { status.text = "⬇️ Qwen 1.5B wird einmalig geladen (ca. 1,1 GB) …" }
+            downloadModel(file)
+        }
+        withContext(Dispatchers.Main) { status.text = "🧠 Pip lädt ihr Gehirn …" }
+        try {
+            model = Llama.loadModel(file.absolutePath, LlamaConfig(contextSize = 256, threads = 4))""",
+    """        if (!isValidGguf(file)) {
+            file.delete()
+            withContext(Dispatchers.Main) { status.text = "⬇️ Qwen 1.5B wird sicher neu geladen …" }
+            downloadModel(file)
+        }
+        if (!isValidGguf(file)) throw IllegalStateException("Das GGUF-Modell ist unvollständig oder ungültig.")
+        withContext(Dispatchers.Main) { status.text = "🧠 Pip lädt ihr Gehirn …" }
+        try {
+            model = Llama.loadModel(file.absolutePath, LlamaConfig(contextSize = 256, threads = 4))""",
+    "GGUF vor nativer Initialisierung validieren",
+)
+replace_once(
+    "    private suspend fun downloadModel(file: File) = withContext(Dispatchers.IO) {",
+    """    private fun isValidGguf(file: File): Boolean {
+        if (!file.isFile || file.length() < 1_000_000_000L) return false
+        return try {
+            file.inputStream().use { input ->
+                val magic = ByteArray(4)
+                input.read(magic) == 4 && magic.contentEquals(byteArrayOf(0x47, 0x47, 0x55, 0x46))
+            }
+        } catch (_: Throwable) { false }
+    }
+
+    private suspend fun downloadModel(file: File) = withContext(Dispatchers.IO) {""",
+    "GGUF-Prüffunktion ergänzen",
+)
+replace_once(
+    """        conn.connect()
+        if (conn.responseCode !in 200..299) throw Exception("HTTP ${conn.responseCode}")
+        conn.inputStream.use { input -> file.outputStream().use { output ->
+            val buffer = ByteArray(1024 * 1024)
+            while (true) { val n = input.read(buffer); if (n < 0) break; output.write(buffer, 0, n) }
+        } }
+        conn.disconnect()""",
+    """        val temp = File(file.parentFile, file.name + ".part")
+        try {
+            conn.connect()
+            if (conn.responseCode !in 200..299) throw Exception("HTTP ${conn.responseCode}")
+            conn.inputStream.use { input -> temp.outputStream().use { output ->
+                val buffer = ByteArray(1024 * 1024)
+                while (true) { val n = input.read(buffer); if (n < 0) break; output.write(buffer, 0, n) }
+            } }
+            if (!isValidGguf(temp)) throw Exception("Modell-Download unvollständig oder kein GGUF")
+            if (file.exists()) file.delete()
+            if (!temp.renameTo(file)) throw Exception("Modell-Datei konnte nicht übernommen werden")
+        } finally {
+            conn.disconnect()
+            if (temp.exists()) temp.delete()
+        }""",
+    "Download atomar und mit Integritätsprüfung speichern",
+)
+
 p.write_text(s, encoding="utf-8")
 print("Wakeword-Gate, fortlaufender Gesprächsmodus und reduzierte Modell-Ressourcennutzung integriert.")
