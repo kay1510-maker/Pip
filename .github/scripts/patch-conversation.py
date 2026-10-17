@@ -9,6 +9,13 @@ def replace_once(old, new, label):
         raise SystemExit(f"Patch fehlgeschlagen: {label}")
     s = s.replace(old, new, 1)
 
+# Remove the manual microphone button: voice starts through "Hey Pip".
+replace_once(
+    '        row.addView(Button(this).apply { text = "🎤 Sprechen"; setOnClickListener { startListening() } }, LinearLayout.LayoutParams(0, -2, 1f))\n',
+    "",
+    "Manuellen Mikrofonknopf entfernen",
+)
+
 # Session state.
 replace_once(
     "    private var recognizer: SpeechRecognizer? = null\n",
