@@ -284,6 +284,43 @@ replace_once(
     "Supertonic-Rückkehr",
 )
 
+# On next launch, show Android's recorded reason for the previous process exit.
+replace_once(
+    "        buildUi()\\n",
+    "        buildUi()\\n        Handler(Looper.getMainLooper()).postDelayed({ showPreviousCrashReason() }, 1200)\\n",
+    "Vorherigen Absturzgrund beim Neustart anzeigen",
+)
+replace_once(
+    "    private fun buildUi() {",
+    """    private fun showPreviousCrashReason() {
+        try {
+            val am = getSystemService(android.app.ActivityManager::class.java)
+            val previous = am?.getHistoricalProcessExitReasons(packageName, 0, 8)
+                ?.firstOrNull { it.reason == android.app.ApplicationExitInfo.REASON_CRASH_NATIVE ||
+                    it.reason == android.app.ApplicationExitInfo.REASON_CRASH ||
+                    it.reason == android.app.ApplicationExitInfo.REASON_LOW_MEMORY ||
+                    it.reason == android.app.ApplicationExitInfo.REASON_ANR }
+            if (previous != null) {
+                val reason = when (previous.reason) {
+                    android.app.ApplicationExitInfo.REASON_CRASH_NATIVE -> "Nativer Absturz (wahrscheinlich Modell-/Bibliothekscode)"
+                    android.app.ApplicationExitInfo.REASON_CRASH -> "Java/Kotlin-Absturz"
+                    android.app.ApplicationExitInfo.REASON_LOW_MEMORY -> "Android hat Pip wegen Speichermangels beendet"
+                    android.app.ApplicationExitInfo.REASON_ANR -> "Pip reagierte zu lange nicht (ANR)"
+                    else -> "Unbekannter Grund"
+                }
+                android.app.AlertDialog.Builder(this)
+                    .setTitle("Pip-Absturzdiagnose")
+                    .setMessage("Android hat für einen vorherigen Start Folgendes gespeichert: $reason\\n\\nExit-Code: ${previous.status}; Zeit: ${java.text.SimpleDateFormat("dd.MM. HH:mm:ss", java.util.Locale.GERMANY).format(java.util.Date(previous.timestamp))}\\n\\nBitte teile mir diesen Grund mit. So können wir die nächste Änderung gezielt wählen.")
+                    .setPositiveButton("OK", null)
+                    .show()
+            }
+        } catch (_: Throwable) { }
+    }
+
+    private fun buildUi() {""",
+    "Absturzdiagnose anzeigen",
+)
+
 # Stop active speech recognition before local model inference to avoid concurrent microphone/model resource pressure.
 replace_once(
     """    private fun ask(text: String) {
