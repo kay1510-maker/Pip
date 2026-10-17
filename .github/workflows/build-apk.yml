@@ -171,7 +171,7 @@ jobs:
           s = p.read_text(encoding="utf-8")
           # In the main reply path, use Supertonic; its own guarded function falls back to Android TTS.
           old = 'withContext(Dispatchers.Main) { tts.speak(answer, TextToSpeech.QUEUE_FLUSH, null, "pip") }'
-          new = 'speakWithSupertonic(displayAnswer)'
+          new = 'withContext(Dispatchers.Main) { tts.speak(answer, TextToSpeech.QUEUE_FLUSH, null, "pip") }'
           if old not in s:
               raise SystemExit("Abbruch: Antwort-Ausgabestelle nicht gefunden; nichts geändert.")
           s = s.replace(old, new, 1)
