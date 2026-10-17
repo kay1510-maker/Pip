@@ -284,5 +284,14 @@ replace_once(
     "Supertonic-Rückkehr",
 )
 
+# Reduce peak memory pressure during local inference, a likely cause of process death after sending a message.
+for old, new in (
+    ("LlamaConfig(contextSize = 512, threads = 6)", "LlamaConfig(contextSize = 256, threads = 4)"),
+    ("maxTokens = 64", "maxTokens = 48"),
+):
+    if old not in s:
+        raise SystemExit(f"Patch fehlgeschlagen: Modell-Ressourcenstelle nicht gefunden: {old}")
+    s = s.replace(old, new, 1)
+
 p.write_text(s, encoding="utf-8")
-print("Wakeword-Gate und fortlaufender Gesprächsmodus wurden in MainActivity integriert.")
+print("Wakeword-Gate, fortlaufender Gesprächsmodus und reduzierte Modell-Ressourcennutzung integriert.")
