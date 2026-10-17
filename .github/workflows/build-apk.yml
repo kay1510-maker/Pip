@@ -45,10 +45,10 @@ jobs:
         run: |
           echo "=== Projektdateien ==="
           find pip-src -maxdepth 5 -type f | sort | head -n 160
-          echo "=== Gradle-Konfiguration ==="
-          find pip-src -maxdepth 3 -type f \\( -name 'build.gradle' -o -name 'build.gradle.kts' -o -name 'AndroidManifest.xml' \\) -print
-          for f in $(find pip-src -maxdepth 3 -type f \\( -name 'build.gradle' -o -name 'build.gradle.kts' -o -name 'AndroidManifest.xml' \\)); do
-            echo "--- $f"; sed -n '1,240p' "$f"
+          echo "=== Gradle-Konfiguration und Manifest ==="
+          find pip-src -maxdepth 4 -type f | grep -E '/(build\.gradle|build\.gradle\.kts|AndroidManifest\.xml)$' | while IFS= read -r f; do
+            echo "--- $f"
+            sed -n '1,220p' "$f"
           done
           echo "=== Sprach-/Modell-/Wakeword-Referenzen ==="
           grep -RniE 'wake.?word|hey pip|VoiceInteractionService|sherpa|supertonic|qwen|gguf|model.*download|SpeechRecognizer|TextToSpeech' pip-src/app/src 2>/dev/null | head -n 240 || true
