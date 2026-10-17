@@ -41,6 +41,15 @@ jobs:
           mkdir -p pip-src
           unzip -q Pip-v4.9-Qwen-1.5B-Supertonic.zip -d pip-src
 
+      - name: Fehlende Sherpa-ONNX-Bibliothek ergänzen
+        run: |
+          mkdir -p pip-src/app/libs
+          curl --fail --location --retry 3 --retry-delay 2 \
+            "https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.7/sherpa-onnx-1.13.7.aar" \
+            --output pip-src/app/libs/sherpa-onnx-1.13.7.aar
+          test -s pip-src/app/libs/sherpa-onnx-1.13.7.aar
+          ls -lh pip-src/app/libs/sherpa-onnx-1.13.7.aar
+
       - name: Pip APK bauen
         run: |
           gradle -p pip-src assembleDebug --no-daemon
