@@ -286,8 +286,12 @@ replace_once(
 
 # Stop active speech recognition before local model inference to avoid concurrent microphone/model resource pressure.
 replace_once(
-    "    private fun ask(text: String) {\\n        val q = text.trim()",
-    "    private fun ask(text: String) {\\n        try { recognizer?.cancel(); recognizer?.destroy() } catch (_: Throwable) { }\\n        recognizer = null\\n        val q = text.trim()",
+    """    private fun ask(text: String) {
+        val q = text.trim()""",
+    """    private fun ask(text: String) {
+        try { recognizer?.cancel(); recognizer?.destroy() } catch (_: Throwable) { }
+        recognizer = null
+        val q = text.trim()""",
     "Spracherkennung vor Inferenz beenden",
 )
 
