@@ -49,12 +49,12 @@ jobs:
           p = Path("pip-src/app/build.gradle")
           s = p.read_text(encoding="utf-8")
           print("\n".join(line for line in s.splitlines() if "versionCode" in line or "versionName" in line))
-          s2, n = re.subn(r'versionCode\s+\d+', 'versionCode 21', s, count=1)
+          s2, n = re.subn(r'versionCode\s+\d+', 'versionCode 22', s, count=1)
           if n != 1:
-              raise SystemExit("versionCode konnte nicht sicher auf 18 gesetzt werden")
-          s2, n = re.subn(r'versionName\s+["\'][^"\']+["\']', 'versionName "1.0.8"', s2, count=1)
+              raise SystemExit("versionCode konnte nicht sicher aktualisiert werden")
+          s2, n = re.subn(r'versionName\s+["\'][^"\']+["\']', 'versionName "1.0.9"', s2, count=1)
           if n != 1:
-              raise SystemExit("versionName konnte nicht sicher auf 1.0.5 gesetzt werden")
+              raise SystemExit("versionName konnte nicht sicher aktualisiert werden")
           p.write_text(s2, encoding="utf-8")
           print("Experiment: Qwen 1.5B personality update (versionCode 21, versionName 1.0.8)")
           PY
@@ -117,47 +117,40 @@ jobs:
       - name: Hey-Pip-Aktivierung und fortlaufendes Gespräch integrieren
         run: python3 .github/scripts/patch-conversation.py
 
-      - name: Absturz beim Laden der Supertonic-Stimme umgehen
+      - name: Natürliche Supertonic-Stimme bevorzugen, TTS als Rückfall
         run: |
           python3 - <<'PY'
           from pathlib import Path
           p = Path("pip-src/app/src/main/java/de/pip/companion/MainActivity.kt")
           s = p.read_text(encoding="utf-8")
           old = "            speakWithSupertonic(answer)"
-          new = '''            withContext(Dispatchers.Main) {
+          new = '''            try {
                           status.text = "🔊 Pip spricht"
-                          try {
-                              tts.language = java.util.Locale.GERMANY
-                              val germanVoices = tts.voices?.filter {
-                                  it.locale.language == "de" && it.locale.country.equals("DE", ignoreCase = true)
-                              } ?: emptyList()
-                              // Qualität zuerst: Ein künstlich klingender Low-Quality-Treffer darf nicht
-                              // nur wegen eines Namensmusters vor einer besseren deutschen Stimme landen.
-                              val preferredVoice = germanVoices.sortedWith(
-                                  compareByDescending<android.speech.tts.Voice> { it.quality }
-                                      .thenBy { it.latency }
-                                      .thenByDescending {
-                                          val n = it.name.lowercase(java.util.Locale.ROOT)
-                                          if (n.contains("female") || n.contains("frau") || n.contains("de-de-x-deb")) 1 else 0
-                                      }
-                              ).firstOrNull() ?: tts.voices?.filter { it.locale.language == "de" }
-                                  ?.maxByOrNull { it.quality }
-                              if (preferredVoice != null) tts.voice = preferredVoice
-                          } catch (_: Exception) {
-                              // Die Standardstimme bleibt aktiv, falls der TTS-Engine keine Stimmenliste anbietet.
+                          speakWithSupertonic(answer)
+                      } catch (voiceError: Exception) {
+                          android.util.Log.e("PipVoice", "Supertonic fehlgeschlagen; nutze Android-TTS als Rückfall", voiceError)
+                          withContext(Dispatchers.Main) {
+                              status.text = "🔊 Pip spricht (Ersatzstimme)"
+                              try {
+                                  tts.language = java.util.Locale.GERMANY
+                                  val bestGermanVoice = tts.voices
+                                      ?.filter { it.locale.language == "de" }
+                                      ?.maxByOrNull { it.quality }
+                                  if (bestGermanVoice != null) tts.voice = bestGermanVoice
+                              } catch (_: Exception) { }
+                              tts.setPitch(1.0f)
+                              tts.setSpeechRate(0.92f)
+                              tts.speak(answer, TextToSpeech.QUEUE_FLUSH, null, "pip-fallback")
                           }
-                          tts.setPitch(1.0f)
-                          tts.setSpeechRate(0.96f)
-                          tts.speak(answer, TextToSpeech.QUEUE_FLUSH, null, "pip")
                       }'''
           if old in s:
               s = s.replace(old, new, 1)
-          elif 'tts.speak(answer, TextToSpeech.QUEUE_FLUSH, null, "pip")' not in s:
-              raise SystemExit("Abbruch: Weder Supertonic-Aufruf noch Android-TTS-Fallback gefunden")
+          elif 'PipVoice' not in s and 'speakWithSupertonic(answer)' in s:
+              print("Supertonic-Fallback-Schutz ist bereits vorhanden.")
           else:
-              print("Android-TTS-Fallback wurde bereits im vorherigen Patch gesetzt.")
+              raise SystemExit("Abbruch: Supertonic-Aufruf nicht gefunden")
           p.write_text(s, encoding="utf-8")
-          print("Supertonic-Initialisierung wird für die Antwort umgangen; Android-TTS übernimmt.")
+          print("Supertonic wird bevorzugt; Android-TTS greift nur bei behandelbaren Sprachfehlern ein.")
           PY
 
       - name: Lokales KI-Modell verkleinern und native Speicherlast senken
@@ -279,6 +272,6 @@ jobs:
       - name: APK hochladen
         uses: actions/upload-artifact@v4
         with:
-          name: Pip-APK-Supertonic
+          name: Pip-1.0.9-Natuerliche-Stimme
           path: pip-src/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
