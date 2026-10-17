@@ -286,8 +286,11 @@ replace_once(
 
 # On next launch, show Android's recorded reason for the previous process exit.
 replace_once(
-    "        buildUi()\\n",
-    "        buildUi()\\n        Handler(Looper.getMainLooper()).postDelayed({ showPreviousCrashReason() }, 1200)\\n",
+    """        buildUi()
+""",
+    """        buildUi()
+        Handler(Looper.getMainLooper()).postDelayed({ showPreviousCrashReason() }, 1200)
+""",
     "Vorherigen Absturzgrund beim Neustart anzeigen",
 )
 replace_once(
