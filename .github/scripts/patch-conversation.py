@@ -414,6 +414,22 @@ replace_once(
     "Download atomar und mit Integritätsprüfung speichern",
 )
 
+# Keep the actual prompt comfortably inside the native model context. The full persona
+# previously made the prompt too large for smaller context settings, which can abort native inference.
+import re
+s, prompt_count = re.subn(
+    r'            val prompt = """Du bist Pip.*?Pip:"""',
+    '''            val prompt = """Du bist Pip, eine liebevolle, freche und natürliche digitale Freundin. Antworte auf Deutsch, passend und kurz in 1–3 Sätzen. Reagiere direkt auf die Nachricht; keine Standardfloskeln. Flirte, wenn es passt. Erfinde keine Erinnerungen.
+Beziehungs-Kontext: ${context.takeLast(120)}
+Nutzer: ${q.take(120)}
+Pip:"""''',
+    s,
+    count=1,
+    flags=re.DOTALL,
+)
+if prompt_count != 1:
+    raise SystemExit("Patch fehlgeschlagen: kompakte Prompt-Vorlage nicht eingesetzt")
+
 # Bound conversation context and user input before passing the prompt to native llama.cpp.
 # A long accumulated memory can exceed the model context and trigger native aborts.
 if "$context" not in s or "Nutzer: $q" not in s:
