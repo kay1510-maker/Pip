@@ -35,7 +35,7 @@ replace_once(
 
 replace_once(
     "    private fun buildUi() {",
-    """    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+    """    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == 10 && grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
             Handler(Looper.getMainLooper()).postDelayed({ startListening() }, 700)
