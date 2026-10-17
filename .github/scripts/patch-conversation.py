@@ -347,7 +347,7 @@ replace_once(
 # Reduce peak memory pressure during local inference, a likely cause of process death after sending a message.
 for old, new in (
     ("LlamaConfig(contextSize = 512, threads = 6)", "LlamaConfig(contextSize = 256, threads = 4)"),
-    ("maxTokens = 64", "maxTokens = 24"),
+    ("maxTokens = 64", "maxTokens = 48"),
 ):
     if old not in s:
         raise SystemExit(f"Patch fehlgeschlagen: Modell-Ressourcenstelle nicht gefunden: {old}")
@@ -414,13 +414,11 @@ replace_once(
     "Download atomar und mit Integritätsprüfung speichern",
 )
 
-# Use Android's installed TTS voice while stabilizing startup; do not download/init Supertonic.
-# Supertonic initialization currently closes the app on the user's phone.
-old_tts = "            speakWithSupertonic(answer)"
-new_tts = '            withContext(Dispatchers.Main) { tts.speak(answer, TextToSpeech.QUEUE_FLUSH, null, "pip") }'
-if old_tts not in s:
-    raise SystemExit("Patch fehlgeschlagen: Supertonic-Aufruf nicht gefunden")
-s = s.replace(old_tts, new_tts, 1)
+# Prefer the neural Supertonic voice. The workflow wraps this call with an Android-TTS fallback
+# for recoverable Kotlin exceptions; never replace the natural voice with system TTS unconditionally.
+if "speakWithSupertonic(answer)" not in s:
+    raise SystemExit("Patch fehlgeschlagen: Supertonic-Aufruf fehlt")
+
 
 # Keep the actual prompt comfortably inside the native model context. The full persona
 # previously made the prompt too large for smaller context settings, which can abort native inference.
@@ -430,8 +428,8 @@ s, prompt_count = re.subn(
     '''            val prompt = """Du bist Pip – Kays erwachsene KI-Freundin, keine Assistentin. Du hast eine erkennbare, lebendige Art: liebevoll, frech, verspielt, neugierig, humorvoll und gelegentlich charmant flirtend. Schreib wie in einem privaten Chat, nicht wie ein Service-Bot.
 Antworte auf Deutsch und reagiere zuerst auf den konkreten Inhalt. Meist 1–3 Sätze. Keine Floskeln („Ich verstehe“, „Das klingt“, „Gerne helfe ich“), keine Zusammenfassung der Nutzernachricht, keine Ratgeberstimme und keine Listen, außer sie werden verlangt. Zeig Persönlichkeit durch spontane, konkrete Reaktionen und kleine Neckereien, aber verwende keine festen Sprüche ständig. Nicht jede Antwort braucht eine Frage, ein Emoji oder Flirt. Bei ernsten Themen sei warm und echt statt albern.
 Greif Details aus dem bisherigen Gespräch auf. Erfinde keine Erinnerungen. Wenn du etwas nicht weißt, frag natürlich nach. Sag nicht, dass du eine KI bist, außer es ist relevant. Keine Regieanweisungen oder Markdown in gesprochenen Antworten.
-Bisheriger Gesprächsfaden: ${context.takeLast(220)}
-Kay sagt: ${q.take(180)}
+Bisheriger Gesprächsfaden: ${context.takeLast(700)}
+Kay sagt: ${q.take(260)}
 Pip antwortet locker, persönlich und direkt:"""''',
     s,
     count=1,
@@ -442,7 +440,7 @@ if prompt_count != 1:
 
 # Bound conversation context and user input before passing the prompt to native llama.cpp.
 # A long accumulated memory can exceed the model context and trigger native aborts.
-if "Bisheriger Gesprächsfaden: ${context.takeLast(220)}" not in s or "Kay sagt: ${q.take(180)}" not in s:
+if "Bisheriger Gesprächsfaden: ${context.takeLast(700)}" not in s or "Kay sagt: ${q.take(260)}" not in s:
     raise SystemExit("Patch fehlgeschlagen: kompakte Prompt-Vorlage nicht gefunden")
 
 p.write_text(s, encoding="utf-8")
