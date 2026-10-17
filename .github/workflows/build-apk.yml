@@ -187,7 +187,7 @@ jobs:
           s = s.replace(old_cfg, new_cfg, 1)
           # Avoid extreme allocations from unexpectedly long model output.
           old_gen = '            val gen = GenerationConfig(sid = 0, speed = 1.05f, numSteps = 8, extra = mapOf("lang" to "de"))'
-          new_gen = '            val speechText = text.replace(Regex("\\s+"), " ").trim().take(240)\n            val gen = GenerationConfig(sid = 0, speed = 1.0f, numSteps = 8, extra = mapOf("lang" to "de"))'
+          new_gen = '            val speechText = text.replace(Regex("\\\\s+"), " ").trim().take(240)\n            val gen = GenerationConfig(sid = 0, speed = 1.0f, numSteps = 8, extra = mapOf("lang" to "de"))'
           if old_gen not in s:
               raise SystemExit("Abbruch: GenerationConfig-Stelle nicht gefunden.")
           s = s.replace(old_gen, new_gen, 1)
