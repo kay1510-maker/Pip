@@ -160,7 +160,7 @@ jobs:
               marker = "    compileOptions {"
               if marker not in s:
                   raise SystemExit("Android-Block nicht gefunden")
-              s = s.replace(marker, block + "\\n" + marker, 1)
+              s = s.replace(marker, block + "\n" + marker, 1)
           p.write_text(s)
           print("Gradle löst doppelte libonnxruntime.so-Dateien über pickFirsts auf.")
           PY
