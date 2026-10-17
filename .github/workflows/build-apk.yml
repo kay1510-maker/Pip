@@ -124,9 +124,12 @@ jobs:
                           status.text = "🔊 Pip spricht mit der Android-Stimme"
                           tts.speak(answer, TextToSpeech.QUEUE_FLUSH, null, "pip")
                       }'''
-          if old not in s:
-              raise SystemExit("Abbruch: Aufruf der Supertonic-Stimme nicht gefunden")
-          s = s.replace(old, new, 1)
+          if old in s:
+              s = s.replace(old, new, 1)
+          elif 'tts.speak(answer, TextToSpeech.QUEUE_FLUSH, null, "pip")' not in s:
+              raise SystemExit("Abbruch: Weder Supertonic-Aufruf noch Android-TTS-Fallback gefunden")
+          else:
+              print("Android-TTS-Fallback wurde bereits im vorherigen Patch gesetzt.")
           p.write_text(s, encoding="utf-8")
           print("Supertonic-Initialisierung wird für die Antwort umgangen; Android-TTS übernimmt.")
           PY
