@@ -26,19 +26,25 @@ jobs:
       - name: TTS-Stimme herunterladen
         run: heed download-tts
 
-      - name: Positive Sprachprobe erzeugen
+      - name: Deutsche Piper-Stimme herunterladen
         run: |
-          mkdir -p hey_pip/positive hey_pip/negative
-          printf 'hey pip\n' | piper --model "$HOME/.heed/voices/en_US-libritts_r-medium.onnx" --output_file hey_pip/positive/hey_pip.wav
-          test -s hey_pip/positive/hey_pip.wav
+          mkdir -p hey_pip/positive hey_pip/negative .voice
+          curl --fail --location --retry 3 "https://huggingface.co/rhasspy/piper-voices/resolve/main/de/de_DE/thorsten/medium/de_DE-thorsten-medium.onnx" -o .voice/de_DE-thorsten-medium.onnx
+          curl --fail --location --retry 3 "https://huggingface.co/rhasspy/piper-voices/resolve/main/de/de_DE/thorsten/medium/de_DE-thorsten-medium.onnx.json" -o .voice/de_DE-thorsten-medium.onnx.json
+          test -s .voice/de_DE-thorsten-medium.onnx
+          test -s .voice/de_DE-thorsten-medium.onnx.json
 
-      - name: Negative Sprachproben erzeugen
+      - name: Deutsche positive und negative Sprachproben erzeugen
         run: |
-          for phrase in "hallo du" "guten morgen" "wie geht es dir" "hey baby" "gute nacht" "pip"; do
-            name=$(printf '%s' "$phrase" | tr ' ' '_' )
-            printf '%s\n' "$phrase" | piper --model "$HOME/.heed/voices/en_US-libritts_r-medium.onnx" --output_file "hey_pip/negative/$name.wav"
+          for i in 1 2 3 4 5 6 7 8; do
+            printf 'Hey Pip\n' | piper --model .voice/de_DE-thorsten-medium.onnx --output_file "hey_pip/positive/hey_pip_$i.wav"
           done
-          ls -lh hey_pip/negative
+          i=0
+          for phrase in "hallo du" "guten morgen" "wie geht es dir" "hey baby" "gute nacht" "pip" "hey bitte" "hey Peter" "hey Piep" "hi Pip" "hey Bib" "hallo Pip" "Hey, wie geht es dir" "guten Abend" "ich brauche Hilfe" "was machst du"; do
+            i=$((i+1))
+            printf '%s\n' "$phrase" | piper --model .voice/de_DE-thorsten-medium.onnx --output_file "hey_pip/negative/negative_$i.wav"
+          done
+          ls -lh hey_pip/positive hey_pip/negative
 
       - name: Hey-Pip-Modell trainieren
         run: heed train hey_pip --epochs 25 --tts-pos 250
