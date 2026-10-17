@@ -123,15 +123,14 @@ jobs:
           from pathlib import Path
           p = Path("pip-src/app/src/main/java/de/pip/companion/MainActivity.kt")
           s = p.read_text(encoding="utf-8")
-          old = "                speakWithSupertonic(answer)"
-          new = '''                withContext(Dispatchers.Main) {
+          old = "speakWithSupertonic(answer)"
+          new = '''withContext(Dispatchers.Main) {
                               status.text = "🔊 Pip spricht"
                               try {
                                   tts.language = java.util.Locale.GERMANY
                                   tts.setPitch(1.0f)
                                   tts.setSpeechRate(0.92f)
-                                  val voices = tts.voices?.filter { it.locale.language == "de" } ?: emptyList()
-                                  val preferred = voices.maxByOrNull { it.quality }
+                                  val preferred = tts.voices?.filter { it.locale.language == "de" }?.maxByOrNull { it.quality }
                                   if (preferred != null) tts.voice = preferred
                                   val result = tts.speak(answer, TextToSpeech.QUEUE_FLUSH, null, "pip-stable")
                                   if (result == TextToSpeech.ERROR) status.text = "Sprachausgabe fehlgeschlagen – bitte Android-Stimme prüfen"
@@ -140,14 +139,11 @@ jobs:
                                   status.text = "Sprachausgabe fehlgeschlagen: ${voiceError.message ?: voiceError.javaClass.simpleName}"
                               }
                           }'''
-          if old in s:
-              s = s.replace(old, new, 1)
-          elif 'pip-stable' in s:
-              print("Stabiler Android-TTS-Pfad ist bereits gesetzt.")
-          else:
+          if old not in s:
               raise SystemExit("Abbruch: Supertonic-Aufruf nicht gefunden")
+          s = s.replace(old, new, 1)
           p.write_text(s, encoding="utf-8")
-          print("Supertonic-Aufruf in der Antwort deaktiviert; stabile Android-TTS-Ausgabe aktiv.")
+          print("Supertonic-Aufruf ersetzt; stabile Android-TTS-Ausgabe aktiv.")
           PY
 
       - name: Lokales KI-Modell verkleinern und native Speicherlast senken
