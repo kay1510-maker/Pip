@@ -58,6 +58,40 @@ jobs:
           print("Pip-Persönlichkeit aktualisiert: FSK-18-Themen bei ausdrücklicher Anfrage offen und passend beantworten.")
           PY
 
+      - name: Modellinitialisierung und Antworten serialisieren
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("pip-src/app/src/main/java/de/pip/companion/MainActivity.kt")
+          s = p.read_text(encoding="utf-8")
+          nl = chr(10)
+          if "import kotlinx.coroutines.sync.Mutex" not in s:
+              target = "import kotlinx.coroutines.withContext" + nl
+              if target not in s:
+                  raise SystemExit("Coroutine-Import fehlt")
+              s = s.replace(target, target + "import kotlinx.coroutines.sync.Mutex" + nl + "import kotlinx.coroutines.sync.withLock" + nl, 1)
+          anchor = "    private var model: Any? = null" + nl
+          if anchor not in s:
+              raise SystemExit("Modellvariable fehlt")
+          if "private val modelInitMutex" not in s:
+              s = s.replace(anchor, anchor + "    private val modelInitMutex = Mutex()" + nl + "    private val inferenceMutex = Mutex()" + nl, 1)
+          before = "            lifecycleScope.launch(Dispatchers.IO) {" + nl + "                prepareModel()" + nl
+          after = "            lifecycleScope.launch(Dispatchers.IO) {" + nl + "                modelInitMutex.withLock { if (model == null) prepareModel() }" + nl
+          if before not in s:
+              raise SystemExit("Modellinitialisierung nicht gefunden")
+          s = s.replace(before, after, 1)
+          old_first = "                askLoaded(q)" + nl
+          if old_first not in s:
+              raise SystemExit("Erste Antwortstelle fehlt")
+          s = s.replace(old_first, "                inferenceMutex.withLock { askLoaded(q) }" + nl, 1)
+          old_second = "            askLoaded(q)" + nl
+          if old_second not in s:
+              raise SystemExit("Zweite Antwortstelle fehlt")
+          s = s.replace(old_second, "            inferenceMutex.withLock { askLoaded(q) }" + nl, 1)
+          p.write_text(s, encoding="utf-8")
+          print("Modellinitialisierung und Inferenz werden gegen parallele Aufrufe geschützt.")
+          PY
+
       - name: Pip-Quellcode und Funktionen prüfen
         run: |
           echo "=== Projektdateien ==="
