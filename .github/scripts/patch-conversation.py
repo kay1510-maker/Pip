@@ -414,5 +414,12 @@ replace_once(
     "Download atomar und mit Integritätsprüfung speichern",
 )
 
+# Bound conversation context and user input before passing the prompt to native llama.cpp.
+# A long accumulated memory can exceed the model context and trigger native aborts.
+if "$context" not in s or "Nutzer: $q" not in s:
+    raise SystemExit("Patch fehlgeschlagen: Prompt-Kontextstellen nicht gefunden")
+s = s.replace("$context", "${context.takeLast(700)}", 1)
+s = s.replace("Nutzer: $q", "Nutzer: ${q.take(500)}", 1)
+
 p.write_text(s, encoding="utf-8")
-print("Wakeword-Gate, fortlaufender Gesprächsmodus und reduzierte Modell-Ressourcennutzung integriert.")
+print("Wakeword-Gate, Gesprächsmodus und begrenzter Prompt für native Inferenz integriert.")
