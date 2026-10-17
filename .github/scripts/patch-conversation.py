@@ -414,6 +414,14 @@ replace_once(
     "Download atomar und mit Integritätsprüfung speichern",
 )
 
+# Use Android's installed TTS voice while stabilizing startup; do not download/init Supertonic.
+# Supertonic initialization currently closes the app on the user's phone.
+old_tts = "            speakWithSupertonic(answer)"
+new_tts = '            withContext(Dispatchers.Main) { tts.speak(answer, TextToSpeech.QUEUE_FLUSH, null, "pip") }'
+if old_tts not in s:
+    raise SystemExit("Patch fehlgeschlagen: Supertonic-Aufruf nicht gefunden")
+s = s.replace(old_tts, new_tts, 1)
+
 # Keep the actual prompt comfortably inside the native model context. The full persona
 # previously made the prompt too large for smaller context settings, which can abort native inference.
 import re
