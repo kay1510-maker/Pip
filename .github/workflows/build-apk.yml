@@ -49,14 +49,14 @@ jobs:
           p = Path("pip-src/app/build.gradle")
           s = p.read_text(encoding="utf-8")
           print("\n".join(line for line in s.splitlines() if "versionCode" in line or "versionName" in line))
-          s2, n = re.subn(r'versionCode\s+\d+', 'versionCode 15', s, count=1)
+          s2, n = re.subn(r'versionCode\s+\d+', 'versionCode 16', s, count=1)
           if n != 1:
-              raise SystemExit("versionCode konnte nicht sicher auf 15 gesetzt werden")
-          s2, n = re.subn(r'versionName\s+["\'][^"\']+["\']', 'versionName "1.0.2"', s2, count=1)
+              raise SystemExit("versionCode konnte nicht sicher auf 16 gesetzt werden")
+          s2, n = re.subn(r'versionName\s+["\'][^"\']+["\']', 'versionName "1.0.3"', s2, count=1)
           if n != 1:
               raise SystemExit("versionName konnte nicht sicher auf 1.0.1 gesetzt werden")
           p.write_text(s2, encoding="utf-8")
-          print("Android-Updateversion: 1.0.2 (versionCode 15)")
+          print("Android-Updateversion: 1.0.3 (versionCode 16)")
           PY
 
       - name: Pips Persönlichkeit erweitern
@@ -112,6 +112,24 @@ jobs:
 
       - name: Hey-Pip-Aktivierung und fortlaufendes Gespräch integrieren
         run: python3 .github/scripts/patch-conversation.py
+
+      - name: Absturz beim Laden der Supertonic-Stimme umgehen
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("pip-src/app/src/main/java/de/pip/companion/MainActivity.kt")
+          s = p.read_text(encoding="utf-8")
+          old = "            speakWithSupertonic(answer)"
+          new = '''            withContext(Dispatchers.Main) {
+                          status.text = "🔊 Pip spricht mit der Android-Stimme"
+                          tts.speak(answer, TextToSpeech.QUEUE_FLUSH, null, "pip")
+                      }'''
+          if old not in s:
+              raise SystemExit("Abbruch: Aufruf der Supertonic-Stimme nicht gefunden")
+          s = s.replace(old, new, 1)
+          p.write_text(s, encoding="utf-8")
+          print("Supertonic-Initialisierung wird für die Antwort umgangen; Android-TTS übernimmt.")
+          PY
 
       - name: Lokales KI-Modell verkleinern und native Speicherlast senken
         run: |
