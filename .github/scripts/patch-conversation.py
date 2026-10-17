@@ -432,10 +432,8 @@ if prompt_count != 1:
 
 # Bound conversation context and user input before passing the prompt to native llama.cpp.
 # A long accumulated memory can exceed the model context and trigger native aborts.
-if "$context" not in s or "Nutzer: $q" not in s:
-    raise SystemExit("Patch fehlgeschlagen: Prompt-Kontextstellen nicht gefunden")
-s = s.replace("$context", "${context.takeLast(250)}", 1)
-s = s.replace("Nutzer: $q", "Nutzer: ${q.take(120)}", 1)
+if "Beziehungs-Kontext: ${context.takeLast(120)}" not in s or "Nutzer: ${q.take(120)}" not in s:
+    raise SystemExit("Patch fehlgeschlagen: kompakte Prompt-Vorlage nicht gefunden")
 
 p.write_text(s, encoding="utf-8")
 print("Wakeword-Gate, Gesprächsmodus und begrenzter Prompt für native Inferenz integriert.")
