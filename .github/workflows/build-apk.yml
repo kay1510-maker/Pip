@@ -58,6 +58,60 @@ jobs:
           print("Pip-Persönlichkeit aktualisiert: FSK-18-Themen bei ausdrücklicher Anfrage offen und passend beantworten.")
           PY
 
+      - name: Modellladen und Anfragen stabilisieren
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("pip-src/app/src/main/java/de/pip/companion/MainActivity.kt")
+          s = p.read_text(encoding="utf-8")
+          s = s.replace("import kotlinx.coroutines.withContext\n", "import kotlinx.coroutines.withContext\nimport kotlinx.coroutines.sync.Mutex\nimport kotlinx.coroutines.sync.withLock\n", 1)
+          anchor = "    private var model: Any? = null\n"
+          if anchor not in s:
+              raise SystemExit("Model-Feld nicht gefunden")
+          s = s.replace(anchor, anchor + "    private val modelInitMutex = Mutex()\n    private val inferenceMutex = Mutex()\n", 1)
+          s = s.replace("                prepareModel()\n", "                modelInitMutex.withLock { if (model == null) prepareModel() }\n", 1)
+          s = s.replace("                askLoaded(q)\n", "                inferenceMutex.withLock { askLoaded(q) }\n", 1)
+          s = s.replace("            askLoaded(q)\n", "            inferenceMutex.withLock { askLoaded(q) }\n", 1)
+          start = s.find("    private suspend fun downloadModel(file: File) = withContext(Dispatchers.IO) {")
+          end = s.find("    private fun ask(text: String) {", start)
+          if start < 0 or end < 0:
+              raise SystemExit("Download-Funktion nicht sicher gefunden")
+          replacement = '''    private suspend fun downloadModel(file: File) = withContext(Dispatchers.IO) {
+          val partial = File(file.parentFile, file.name + ".part")
+          partial.delete()
+          val conn = URL(modelUrl).openConnection() as HttpURLConnection
+          try {
+              conn.connectTimeout = 30000
+              conn.readTimeout = 120000
+              conn.instanceFollowRedirects = true
+              conn.setRequestProperty("User-Agent", "Pip-Android")
+              conn.connect()
+              if (conn.responseCode !in 200..299) throw Exception("HTTP ${conn.responseCode}")
+              conn.inputStream.use { input -> partial.outputStream().buffered().use { output ->
+                  val buffer = ByteArray(1024 * 1024)
+                  while (true) {
+                      val n = input.read(buffer)
+                      if (n < 0) break
+                      output.write(buffer, 0, n)
+                  }
+              } }
+              if (partial.length() < 800_000_000L) throw Exception("Modell-Download unvollständig (${partial.length()} Bytes)")
+              if (file.exists() && !file.delete()) throw Exception("Alte Modelldatei konnte nicht ersetzt werden")
+              if (!partial.renameTo(file)) throw Exception("Modell-Datei konnte nicht fertiggestellt werden")
+          } catch (e: Throwable) {
+              partial.delete()
+              throw e
+          } finally {
+              conn.disconnect()
+          }
+      }
+
+      '''
+          s = s[:start] + replacement + s[end:]
+          p.write_text(s, encoding="utf-8")
+          print("Modell-Download nutzt nun .part + Größenprüfung; Modellinitialisierung und Inferenz sind serialisiert.")
+          PY
+
       - name: Pip-Quellcode und Funktionen prüfen
         run: |
           echo "=== Projektdateien ==="
