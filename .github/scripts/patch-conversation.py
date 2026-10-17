@@ -347,7 +347,7 @@ replace_once(
 # Reduce peak memory pressure during local inference, a likely cause of process death after sending a message.
 for old, new in (
     ("LlamaConfig(contextSize = 512, threads = 6)", "LlamaConfig(contextSize = 256, threads = 4)"),
-    ("maxTokens = 64", "maxTokens = 48"),
+    ("maxTokens = 64", "maxTokens = 24"),
 ):
     if old not in s:
         raise SystemExit(f"Patch fehlgeschlagen: Modell-Ressourcenstelle nicht gefunden: {old}")
@@ -419,7 +419,7 @@ replace_once(
 if "$context" not in s or "Nutzer: $q" not in s:
     raise SystemExit("Patch fehlgeschlagen: Prompt-Kontextstellen nicht gefunden")
 s = s.replace("$context", "${context.takeLast(250)}", 1)
-s = s.replace("Nutzer: $q", "Nutzer: ${q.take(200)}", 1)
+s = s.replace("Nutzer: $q", "Nutzer: ${q.take(120)}", 1)
 
 p.write_text(s, encoding="utf-8")
 print("Wakeword-Gate, Gesprächsmodus und begrenzter Prompt für native Inferenz integriert.")
