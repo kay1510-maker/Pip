@@ -117,7 +117,10 @@ jobs:
         run: |
           mkdir -p pip-src/app/src/main/assets/hey_pip
           curl --fail --silent --show-error -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/runs/39036989071/artifacts" -o /tmp/artifacts.json
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/workflows/train-hey-pip.yml/runs?status=success&per_page=10" -o /tmp/runs.json
+          RUN_ID="$(python3 -c 'import json; d=json.load(open("/tmp/runs.json")); print(next(r["id"] for r in d["workflow_runs"] if r["conclusion"]=="success"))')"
+          curl --fail --silent --show-error -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/artifacts" -o /tmp/artifacts.json
           ARTIFACT_ID="$(python3 -c 'import json; d=json.load(open("/tmp/artifacts.json")); print(next(a["id"] for a in d["artifacts"] if a["name"]=="Hey-Pip-Wakeword-Model"))')"
           curl --fail --location --retry 3 -H "Authorization: Bearer $GH_TOKEN" \
             "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID/zip" -o /tmp/hey-pip.zip
