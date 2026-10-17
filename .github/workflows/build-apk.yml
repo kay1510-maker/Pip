@@ -50,7 +50,14 @@ jobs:
             echo "--- $f"
             sed -n '1,220p' "$f"
           done
-          echo "=== Sprach-/Modell-/Wakeword-Referenzen ==="
+          echo "=== Vollständige MainActivity ==="
+          sed -n '1,380p' pip-src/app/src/main/java/de/pip/companion/MainActivity.kt
+          echo "=== Voice-Interaction-Konfiguration ==="
+          find pip-src/app/src/main -type f | sort | grep -E 'voice_interaction|PipVoice|res/xml' | while IFS= read -r f; do
+            echo "--- $f"
+            sed -n '1,180p' "$f"
+          done
+          echo "=== Wakeword-/Modell-Referenzen ==="
           grep -RniE 'wake.?word|hey pip|VoiceInteractionService|sherpa|supertonic|qwen|gguf|model.*download|SpeechRecognizer|TextToSpeech' pip-src/app/src 2>/dev/null | head -n 240 || true
 
       - name: Fehlende Sherpa-ONNX-Bibliothek ergänzen
