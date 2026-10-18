@@ -353,11 +353,19 @@ replace_once(
 # Reduce peak memory pressure during local inference, a likely cause of process death after sending a message.
 for old, new in (
     ("LlamaConfig(contextSize = 512, threads = 6)", "LlamaConfig(contextSize = 256, threads = 4)"),
-    ("maxTokens = 40", "maxTokens = 48"),
 ):
-    if old not in s:
-        raise SystemExit(f"Patch fehlgeschlagen: Modell-Ressourcenstelle nicht gefunden: {old}")
-    s = s.replace(old, new, 1)
+    if old in s:
+        s = s.replace(old, new, 1)
+
+# Workflow revisions may already have lowered the token limit. Normalize whichever known value is present.
+token_updated = False
+for old in ("maxTokens = 64", "maxTokens = 40", "maxTokens = 32", "maxTokens = 20"):
+    if old in s:
+        s = s.replace(old, "maxTokens = 48", 1)
+        token_updated = True
+        break
+if not token_updated and "maxTokens = 48" not in s:
+    raise SystemExit("Patch fehlgeschlagen: maxTokens-Stelle nicht gefunden")
 
 # Make GGUF download atomic and reject incomplete/non-GGUF files before native code sees them.
 replace_once(
