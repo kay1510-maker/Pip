@@ -361,10 +361,10 @@ for old, new in (
 token_updated = False
 for old in ("maxTokens = 64", "maxTokens = 40", "maxTokens = 32", "maxTokens = 20"):
     if old in s:
-        s = s.replace(old, "maxTokens = 48", 1)
+        s = s.replace(old, "maxTokens = 32", 1)
         token_updated = True
         break
-if not token_updated and "maxTokens = 48" not in s:
+if not token_updated and "maxTokens = 32" not in s:
     raise SystemExit("Patch fehlgeschlagen: maxTokens-Stelle nicht gefunden")
 
 # Make GGUF download atomic and reject incomplete/non-GGUF files before native code sees them.
@@ -384,7 +384,7 @@ replace_once(
         if (!isValidGguf(file)) throw IllegalStateException("Das GGUF-Modell ist unvollständig oder ungültig.")
         withContext(Dispatchers.Main) { status.text = "🧠 Pip lädt ihr Gehirn …" }
         try {
-            model = Llama.loadModel(file.absolutePath, LlamaConfig(contextSize = 1024, threads = 4))""",
+            model = Llama.loadModel(file.absolutePath, LlamaConfig(contextSize = 512, threads = 4))""",
     "GGUF vor nativer Initialisierung validieren",
 )
 replace_once(
