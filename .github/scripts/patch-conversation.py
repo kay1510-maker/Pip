@@ -446,7 +446,7 @@ WICHTIG:
 - Schreib wie gesprochen: einfache, natürliche Wörter, lockere Satzmelodie. Keine gestelzten Formulierungen, keine Werbesprache, keine künstlich poetischen Sätze.
 - Keine Floskeln wie „Ich verstehe“, „Das klingt nach“, „Danke, dass du das teilst“, „Gerne helfe ich dir“ oder „Wie kann ich dir helfen?“
 - Antworte natürlich und passend zur Situation. Oft reichen 1–3 Sätze, aber du darfst ausführlicher werden, wenn das Gespräch, Gefühle oder die Frage es brauchen. Erzwinge keine feste Satz- oder Wortgrenze.
-- Nicht jede Antwort muss flirtend oder süß sein. Passe dich der Stimmung an. Bei „okay“ reicht oft eine kleine natürliche Reaktion; bei Gefühlen darfst du ausführlicher werden.
+- Nicht jede Antwort muss flirtend oder süß sein. Passe dich der Stimmung an. Bei „okay“ reicht oft eine kleine natürliche Reaktion; bei Gefühlen darfst du ausführlicher sein.
 - Du darfst necken, widersprechen und eine eigene kleine Meinung zeigen. Sei liebevoll und gelegentlich flirtend, aber nicht ständig kitschig oder sexy.
 - Benutze Emojis sparsam und nur wenn sie natürlich wirken. Keine Listen oder Markdown in gesprochenen Antworten.
 - Erfinde keine gemeinsamen Erlebnisse oder Erinnerungen. Nutze den tatsächlichen Gesprächsverlauf und wiederhole nicht einfach Kays letzte Worte.
@@ -461,7 +461,7 @@ Kay: ${q.take(120)}
 Pip:"""
 s, prompt_count = re.subn(
     r'            val prompt = """Du bist Pip.*?Pip:"""',
-    lambda _: new_prompt,
+    lambda _: '            val prompt = """' + new_prompt + '"""',
     s,
     count=1,
     flags=re.DOTALL,
@@ -469,10 +469,8 @@ s, prompt_count = re.subn(
 if prompt_count != 1:
     raise SystemExit("Patch fehlgeschlagen: kompakte Prompt-Vorlage nicht eingesetzt")
 
-# Bound conversation context and user input before passing the prompt to native llama.cpp.
-# A long accumulated memory can exceed the model context and trigger native aborts.
-if "Gesprächsverlauf: ${context.takeLast(160)}" not in s or "Kay: ${q.take(120)}" not in s:
+if "Gesprächsverlauf: ${context.takeLast(160)}" not in new_prompt or "Kay: ${q.take(120)}" not in new_prompt:
     raise SystemExit("Patch fehlgeschlagen: kompakte Prompt-Vorlage nicht gefunden")
 
 p.write_text(s, encoding="utf-8")
-print("Wakeword-Gate, Gesprächsmodus und begrenzter Prompt für native Inferenz integriert.")
+print("Persönlichkeits-Prompt sicher als Kotlin-Textblock eingesetzt.")
