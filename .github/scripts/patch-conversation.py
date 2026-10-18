@@ -265,6 +265,16 @@ replace_once(
     """    override fun onInit(statusCode: Int) {
         if (statusCode == TextToSpeech.SUCCESS) {
             tts.language = Locale.GERMAN
+            try {
+                val germanVoices = tts.voices?.filter { it.locale.language == "de" } ?: emptyList()
+                val selectedVoice = germanVoices.sortedWith(
+                    compareByDescending<android.speech.tts.Voice> { it.quality }
+                        .thenBy { it.latency }
+                ).firstOrNull()
+                if (selectedVoice != null) tts.voice = selectedVoice
+            } catch (_: Throwable) { }
+            tts.setPitch(1.0f)
+            tts.setSpeechRate(0.96f)
             tts.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
                 override fun onStart(utteranceId: String?) {}
                 override fun onDone(utteranceId: String?) { scheduleListenAgain() }
@@ -347,7 +357,7 @@ replace_once(
 # Reduce peak memory pressure during local inference, a likely cause of process death after sending a message.
 for old, new in (
     ("LlamaConfig(contextSize = 512, threads = 6)", "LlamaConfig(contextSize = 256, threads = 4)"),
-    ("maxTokens = 64", "maxTokens = 40"),
+    ("maxTokens = 64", "maxTokens = 32"),
 ):
     if old not in s:
         raise SystemExit(f"Patch fehlgeschlagen: Modell-Ressourcenstelle nicht gefunden: {old}")
