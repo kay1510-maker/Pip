@@ -353,7 +353,7 @@ replace_once(
 # Reduce peak memory pressure during local inference, a likely cause of process death after sending a message.
 for old, new in (
     ("LlamaConfig(contextSize = 512, threads = 6)", "LlamaConfig(contextSize = 256, threads = 4)"),
-    ("maxTokens = 64", "maxTokens = 48"),
+    ("maxTokens = 40", "maxTokens = 48"),
 ):
     if old not in s:
         raise SystemExit(f"Patch fehlgeschlagen: Modell-Ressourcenstelle nicht gefunden: {old}")
