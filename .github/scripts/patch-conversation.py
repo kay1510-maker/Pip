@@ -378,19 +378,19 @@ replace_once(
             model = Llama.loadModel(file.absolutePath, LlamaConfig(contextSize = 256, threads = 4))""",
     """        if (!isValidGguf(file)) {
             file.delete()
-            withContext(Dispatchers.Main) { status.text = "⬇️ Qwen 1.5B wird sicher neu geladen …" }
+            withContext(Dispatchers.Main) { status.text = "⬇️ Qwen 0.5B wird sicher neu geladen …" }
             downloadModel(file)
         }
         if (!isValidGguf(file)) throw IllegalStateException("Das GGUF-Modell ist unvollständig oder ungültig.")
         withContext(Dispatchers.Main) { status.text = "🧠 Pip lädt ihr Gehirn …" }
         try {
-            model = Llama.loadModel(file.absolutePath, LlamaConfig(contextSize = 512, threads = 4))""",
+            model = Llama.loadModel(file.absolutePath, LlamaConfig(contextSize = 256, threads = 4))""",
     "GGUF vor nativer Initialisierung validieren",
 )
 replace_once(
     "    private suspend fun downloadModel(file: File) = withContext(Dispatchers.IO) {",
     """    private fun isValidGguf(file: File): Boolean {
-        if (!file.isFile || file.length() < 1_000_000_000L) return false
+        if (!file.isFile || file.length() < 250_000_000L) return false
         return try {
             file.inputStream().use { input ->
                 val magic = ByteArray(4)
