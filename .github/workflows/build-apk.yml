@@ -49,7 +49,7 @@ jobs:
           p = Path("pip-src/app/build.gradle")
           s = p.read_text(encoding="utf-8")
           print("\n".join(line for line in s.splitlines() if "versionCode" in line or "versionName" in line))
-          s2, n = re.subn(r'versionCode\s+\d+', 'versionCode 21', s, count=1)
+          s2, n = re.subn(r'versionCode\s+\d+', 'versionCode 22', s, count=1)
           if n != 1:
               raise SystemExit("versionCode konnte nicht sicher auf 18 gesetzt werden")
           s2, n = re.subn(r'versionName\s+["\'][^"\']+["\']', 'versionName "1.0.8"', s2, count=1)
