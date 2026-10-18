@@ -12,8 +12,8 @@ def replace_once(old, new, label):
 # Remove the manual microphone button: voice starts through "Hey Pip".
 replace_once(
     '        row.addView(Button(this).apply { text = "🎤 Sprechen"; setOnClickListener { startListening() } }, LinearLayout.LayoutParams(0, -2, 1f))\n',
-    "",
-    "Manuellen Mikrofonknopf entfernen",
+    '        row.addView(Button(this).apply { text = "🎤 Sprechen"; setOnClickListener { startListening() } }, LinearLayout.LayoutParams(0, -2, 1f))\n',
+    "Manuellen Mikrofonknopf für gezielte Spracheingabe beibehalten",
 )
 
 # Add an explicit microphone foreground service for locked-screen listening.
@@ -146,21 +146,15 @@ replace_once(
     "    private fun buildUi() {",
     """    override fun onPause() {
         super.onPause()
-        if (!isFinishing && ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-            recognizer?.destroy(); recognizer = null
-            try {
-                val intent = Intent(this, PipListeningService::class.java)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent) else startService(intent)
-            } catch (_: Throwable) { }
-        }
+        // Do not keep SpeechRecognizer running while the user types or switches apps.
+        try { recognizer?.cancel(); recognizer?.destroy() } catch (_: Throwable) { }
+        recognizer = null
     }
 
     override fun onResume() {
         super.onResume()
+        // Voice input is started only by the microphone button; this prevents it stealing text input focus.
         stopService(Intent(this, PipListeningService::class.java))
-        if (::output.isInitialized && ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-            Handler(Looper.getMainLooper()).postDelayed({ if (!isFinishing && !isDestroyed) startListening() }, 700)
-        }
     }
 
     private fun buildUi() {""",
@@ -185,7 +179,7 @@ replace_once(
             != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.RECORD_AUDIO), 10)
         } else {
-            Handler(Looper.getMainLooper()).postDelayed({ startListening() }, 700)
+            status.text = "Mikrofon bereit – tippe auf 🎤 Sprechen"
         }
 """,
     "Mikrofonberechtigung",
@@ -196,7 +190,7 @@ replace_once(
     """    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == 10 && grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-            Handler(Looper.getMainLooper()).postDelayed({ startListening() }, 700)
+            status.text = "Mikrofon bereit – tippe auf 🎤 Sprechen"
         } else if (requestCode == 10) {
             status.text = "Mikrofonzugriff fehlt. Du kannst Pip weiterhin schreiben."
         }
@@ -209,12 +203,10 @@ replace_once(
 replace_once(
     "    private fun startListening() {",
     """    private fun scheduleListenAgain() {
-        Handler(Looper.getMainLooper()).postDelayed({
-            if (!isFinishing && !isDestroyed &&
-                ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-                startListening()
-            }
-        }, 900)
+        // Intentionally no automatic restart: repeated recognition was competing with typing and sending.
+        if (!isFinishing && !isDestroyed) {
+            status.text = "Bereit – tippe zum Sprechen auf 🎤 Sprechen"
+        }
     }
 
     private fun startListening() {""",
@@ -225,28 +217,14 @@ replace_once(
     '            override fun onResults(b: Bundle?) { b?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()?.let { input.setText(it); ask(it) } }',
     """            override fun onResults(b: Bundle?) {
                 val heard = b?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()?.trim().orEmpty()
-                if (heard.isBlank()) { scheduleListenAgain(); return }
-                val normalized = heard.lowercase(Locale.GERMAN).replace(",", "").replace(".", "")
-                if (normalized.contains("pip ende") || normalized.contains("gespräch beenden") || normalized.contains("gespraech beenden")) {
-                    conversationMode = false
-                    output.text = "Alles klar, ich bin wieder im Bereitschaftsmodus. Sag Hey Pip, wenn du mich brauchst. ❤️"
-                    status.text = "💤 Sag Hey Pip zum Starten"
+                if (heard.isBlank()) {
+                    status.text = "Nichts erkannt – tippe auf 🎤 und versuche es nochmal"
                     scheduleListenAgain()
                     return
                 }
-                if (!conversationMode) {
-                    if (normalized.contains("hey pip") || normalized.contains("hei pip")) {
-                        conversationMode = true
-                        status.text = "💗 Gespräch aktiv – du kannst einfach weiterreden"
-                        val remainder = heard.replace(Regex("(?i)hey[, ]+pip|hei[, ]+pip"), "").trim()
-                        if (remainder.isNotBlank()) { input.setText(remainder); ask(remainder) } else scheduleListenAgain()
-                    } else {
-                        scheduleListenAgain()
-                    }
-                } else {
-                    input.setText(heard)
-                    ask(heard)
-                }
+                input.setText(heard)
+                status.text = "Nachricht erkannt – Pip antwortet …"
+                ask(heard)
             }""",
     "Wakeword- und Gesprächslogik",
 )
