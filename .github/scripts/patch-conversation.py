@@ -266,21 +266,39 @@ replace_once(
         if (statusCode == TextToSpeech.SUCCESS) {
             tts.language = Locale.GERMAN
             try {
-                val germanVoices = tts.voices?.filter { it.locale.language == "de" } ?: emptyList()
-                val selectedVoice = germanVoices.sortedWith(
+                val germanVoices = tts.voices?.filter {
+                    it.locale.language == "de" && it.locale.country.equals("DE", ignoreCase = true)
+                } ?: emptyList()
+                val voiceNames = germanVoices.map { it.name.lowercase(java.util.Locale.ROOT) }
+                // Prefer likely female German voices; never select by quality alone, which picked a male voice.
+                val femaleVoices = germanVoices.filter {
+                    val n = it.name.lowercase(java.util.Locale.ROOT)
+                    n.contains("female") || n.contains("frau") ||
+                        n.contains("de-de-x-dea") || n.contains("de-de-x-dee") ||
+                        n.contains("de-de-x-def") || n.contains("de-de-x-deh")
+                }
+                val candidates = femaleVoices.ifEmpty {
+                    // If the engine exposes no clear female label, avoid explicitly male profiles.
+                    germanVoices.filter {
+                        val n = it.name.lowercase(java.util.Locale.ROOT)
+                        !n.contains("male") && !n.contains("man") &&
+                            !n.contains("de-de-x-deb") && !n.contains("de-de-x-ded")
+                    }
+                }
+                val selectedVoice = candidates.sortedWith(
                     compareByDescending<android.speech.tts.Voice> { it.quality }
                         .thenBy { it.latency }
                 ).firstOrNull()
                 if (selectedVoice != null) tts.voice = selectedVoice
+                tts.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
+                    override fun onStart(utteranceId: String?) {}
+                    override fun onDone(utteranceId: String?) { scheduleListenAgain() }
+                    @Deprecated("Deprecated in Java")
+                    override fun onError(utteranceId: String?) { scheduleListenAgain() }
+                })
             } catch (_: Throwable) { }
             tts.setPitch(1.0f)
             tts.setSpeechRate(0.96f)
-            tts.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
-                override fun onStart(utteranceId: String?) {}
-                override fun onDone(utteranceId: String?) { scheduleListenAgain() }
-                @Deprecated("Deprecated in Java")
-                override fun onError(utteranceId: String?) { scheduleListenAgain() }
-            })
         }
     }""",
     "TTS-Rückkehr",
