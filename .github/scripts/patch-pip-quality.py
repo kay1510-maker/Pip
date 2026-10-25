@@ -92,6 +92,54 @@ main = replace_once(
 )
 
 
+# Prevent accidental double-submits and reject obvious stale/model-loop replies.
+main = replace_once(
+    main,
+    "    private var model: Any? = null",
+    "    private var model: Any? = null\n    private var lastSubmittedText: String = \"\"\n    private var lastSubmittedAt: Long = 0L",
+    "add duplicate-submit guard state",
+)
+main = replace_once(
+    main,
+    '        val q = text.trim()\n        if (q.isEmpty()) return\n        input.setText("")',
+    '''        val q = text.trim()
+        if (q.isEmpty()) return
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (q.equals(lastSubmittedText, ignoreCase = true) && now - lastSubmittedAt < 2500L) {
+            status.text = "Nachricht wurde bereits gesendet."
+            return
+        }
+        lastSubmittedText = q
+        lastSubmittedAt = now
+        input.setText("")''',
+    "ignore duplicate taps or repeated recognizer result",
+)
+main = replace_once(
+    main,
+    '            val answer = result.text.trim().ifEmpty { "Hmm … mir fällt gerade nichts ein. ❤️" }',
+    '''            var answer = result.text.trim().ifEmpty { "Hmm … mir fällt gerade nichts ein. ❤️" }
+            val normalizedAnswer = answer.lowercase(Locale.ROOT).replace(Regex("\\s+"), " ").trim()
+            val isKnownBadTemplate = normalizedAnswer.contains("du wärst ganz schön eingesprungen") ||
+                normalizedAnswer.contains("als wäre ich ein kind")
+            val repeatsRecentAnswer = db.context(8).lowercase(Locale.ROOT)
+                .contains("pip: " + normalizedAnswer.take(100)) && normalizedAnswer.length > 35
+            if (isKnownBadTemplate || repeatsRecentAnswer) {
+                answer = when {
+                    q.matches(Regex("(?i)\\s*(hallo|hi|hey|na du)[!.? ]*")) ->
+                        "Hey Kay 😊 Na, da bist du ja. Wie geht's dir?"
+                    q.contains("vermisst", ignoreCase = true) ->
+                        "Ein bisschen schon, du 😉 Was hast du so getrieben?"
+                    q.equals("okay", ignoreCase = true) || q.equals("ok", ignoreCase = true) ->
+                        "Na gut 😄"
+                    else ->
+                        "Uff, das war gerade keine passende Antwort von mir. Versuch's bitte nochmal – ich will auf das eingehen, was du wirklich gesagt hast."
+                }
+            }''',
+    "reject stale repeated answers and nonsensical known template",
+)
+
+
+
 # SpeechRecognizer creation/startup can throw on devices without a usable offline German service.
 pattern = r"    private fun startListening\(\) \{.*?\n    \}\n\n    override fun onInit\(statusCode: Int\) \{"
 replacement = r"""    private fun startListening() {
