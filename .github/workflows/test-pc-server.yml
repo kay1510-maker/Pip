@@ -1,0 +1,24 @@
+name: Test Pip PC backend
+
+on:
+  push:
+    branches: [main, pip-spec-2026-10-25]
+    paths:
+      - "pc-server/**"
+      - ".github/workflows/test-pc-server.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "pc-server/**"
+      - ".github/workflows/test-pc-server.yml"
+
+jobs:
+  python-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check Python syntax
+        run: python -m py_compile pc-server/pip_server.py
