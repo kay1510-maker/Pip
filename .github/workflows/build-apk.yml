@@ -239,6 +239,9 @@ jobs:
       - name: Pip-Funktionen gemeinsam integrieren
         run: python3 .github/scripts/integrate-pip.py
 
+      - name: Pip-Chat und Gedächtnis erweitern
+        run: python3 .github/scripts/extend-pip.py
+
       - name: Pip-Quellcode und Funktionen prüfen
         run: |
           echo "=== Projektdateien ==="
