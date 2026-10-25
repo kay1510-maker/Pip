@@ -200,8 +200,7 @@ print("Pip-Integration erweitert: sichtbarer Verlauf, bearbeitbare Erinnerungen 
 s = main_path.read_text(encoding="utf-8")
 s = replace_once(
     s,
-    """        appendHistory("Kay", q)
-        if (model == null) {""",
+    '        appendHistory("Kay", q)\n',
     """        appendHistory("Kay", q)
         val memoryMatch = Regex("(?i)^(?:pip[, ]*)?(?:merk dir|merke dir|bitte merk dir|bitte merke dir)\\\\s*[:,\\\\-]?\\\\s*(.+)$").find(q)
         val explicitMemory = memoryMatch?.groupValues?.getOrNull(1)?.trim()?.takeIf { it.isNotBlank() }?.take(500)
@@ -219,9 +218,8 @@ s = replace_once(
             input.setText("")
             return
         }
-        if (model == null) {""",
+""",
     "add explicit long-term memory command"
 )
 main_path.write_text(s, encoding="utf-8")
 print("Expliziter Merker-Befehl integriert.")
-
