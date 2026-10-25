@@ -497,3 +497,131 @@ unused_wakeword = BASE / "PipListeningService.kt"
 if unused_wakeword.exists():
     unused_wakeword.unlink()
     print("Removed unused wake-word service source.")
+
+
+# Optional PC-hosted Ollama brain. This is opt-in; the local model remains the fallback.
+s = main_path.read_text(encoding="utf-8")
+s = replace_once(
+    s,
+    'val options = arrayOf("Gesprächsstil anpassen", "Gespeicherte Erinnerungen ansehen / löschen", "Alle Erinnerungen zurücksetzen", "Benachrichtigungen außerhalb der App", "Deutsche Stimme auswählen", "Name und Avatar anpassen")',
+    'val options = arrayOf("Gesprächsstil anpassen", "Gespeicherte Erinnerungen ansehen / löschen", "Alle Erinnerungen zurücksetzen", "Benachrichtigungen außerhalb der App", "Deutsche Stimme auswählen", "Name und Avatar anpassen", "PC-Gehirn verbinden")',
+    "add PC brain settings"
+)
+s = replace_once(s, "                    5 -> showProfileSettings()\n                }", "                    5 -> showProfileSettings()\n                    6 -> showPcSettings()\n                }", "wire PC brain settings")
+s = replace_once(s, "    private fun showPipSettings() {", """    private fun showPcSettings() {
+        val prefs = getSharedPreferences("pip_settings", MODE_PRIVATE)
+        val panel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(32, 12, 32, 0)
+        }
+        val enabled = Switch(this).apply {
+            text = "PC als Pip-Gehirn verwenden"
+            isChecked = prefs.getBoolean("pc_backend_enabled", false)
+        }
+        val address = EditText(this).apply {
+            hint = "PC-Adresse, z. B. http://192.168.1.20:8765"
+            setSingleLine(true)
+            setText(prefs.getString("pc_backend_url", "http://192.168.1.20:8765") ?: "")
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI
+        }
+        val token = EditText(this).apply {
+            hint = "PIP_TOKEN vom PC"
+            setSingleLine(true)
+            setText(prefs.getString("pc_backend_token", "") ?: "")
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+        }
+        panel.addView(enabled)
+        panel.addView(TextView(this).apply {
+            text = "Handy und PC müssen im selben privaten WLAN sein. HTTP ist unverschlüsselt: nur im eigenen Heimnetz nutzen und den Token geheim halten."
+            textSize = 13f
+            setPadding(0, 8, 0, 12)
+        })
+        panel.addView(address)
+        panel.addView(token)
+        AlertDialog.Builder(this)
+            .setTitle("Pip auf dem PC")
+            .setView(panel)
+            .setNegativeButton("Abbrechen", null)
+            .setPositiveButton("Speichern") { _, _ ->
+                val url = address.text.toString().trim().trimEnd('/')
+                val secret = token.text.toString().trim()
+                if (enabled.isChecked && ((!url.startsWith("http://") && !url.startsWith("https://")) || secret.length < 24)) {
+                    status.text = "Bitte PC-Adresse und einen langen Token eintragen."
+                    return@setPositiveButton
+                }
+                prefs.edit()
+                    .putBoolean("pc_backend_enabled", enabled.isChecked)
+                    .putString("pc_backend_url", url)
+                    .putString("pc_backend_token", secret)
+                    .apply()
+                status.text = if (enabled.isChecked) "PC-Gehirn gespeichert. Die nächste Nachricht wird an den PC gesendet." else "Lokales Handy-Modell ausgewählt."
+            }
+            .show()
+    }
+
+    private suspend fun askWithPc(q: String) {
+        val prefs = getSharedPreferences("pip_settings", MODE_PRIVATE)
+        val base = (prefs.getString("pc_backend_url", "") ?: "").trim().trimEnd('/')
+        val token = (prefs.getString("pc_backend_token", "") ?: "").trim()
+        if (base.isBlank() || token.isBlank()) {
+            withContext(Dispatchers.Main) {
+                status.text = "PC-Verbindung nicht eingerichtet."
+                output.text = "Öffne Einstellungen und trage die PC-Adresse und den PIP_TOKEN ein."
+            }
+            return
+        }
+        var conn: HttpURLConnection? = null
+        try {
+            conn = (URL("$base/chat").openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                connectTimeout = 15000
+                readTimeout = 180000
+                doOutput = true
+                setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                setRequestProperty("Authorization", "Bearer $token")
+            }
+            val body = org.json.JSONObject()
+                .put("message", q)
+                .put("session_id", "handy-1")
+                .toString().toByteArray(Charsets.UTF_8)
+            conn.outputStream.use { it.write(body) }
+            val code = conn.responseCode
+            val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+            val payload = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
+            val json = org.json.JSONObject(payload.ifBlank { "{}" })
+            if (code !in 200..299) throw IllegalStateException(json.optString("error", "HTTP $code"))
+            val answer = json.optString("reply", "").trim()
+            if (answer.isBlank()) throw IllegalStateException("Der PC hat eine leere Antwort geliefert.")
+            db.remember("Gespräch", "Nutzer: $q | Pip: $answer", 1)
+            db.pruneConversationLog(500)
+            withContext(Dispatchers.Main) {
+                output.text = answer
+                appendHistory("Pip", answer)
+                status.text = "PC verbunden · " + json.optString("model", "Ollama")
+            }
+            if (prefs.getBoolean("speech_enabled", true)) speakWithSupertonic(answer)
+        } catch (e: Throwable) {
+            withContext(Dispatchers.Main) {
+                status.text = "PC-Verbindung fehlgeschlagen."
+                output.text = "Ich erreiche mein PC-Gehirn gerade nicht. Prüfe, ob der Server läuft und die PC-Adresse stimmt. ($e)"
+            }
+        } finally {
+            conn?.disconnect()
+        }
+    }
+
+    private fun showPipSettings() {""", "add PC brain client and settings")
+s = replace_once(
+    s,
+    '        appendHistory("Kay", q)\n        if (model == null) {',
+    '        appendHistory("Kay", q)\n        if (getSharedPreferences("pip_settings", MODE_PRIVATE).getBoolean("pc_backend_enabled", false)) {\n            output.text = "Pip denkt auf dem PC nach … ❤️"\n            lifecycleScope.launch(Dispatchers.IO) { askWithPc(q) }\n            return\n        }\n        if (model == null) {',
+    "route chat to PC when enabled"
+)
+main_path.write_text(s, encoding="utf-8")
+
+manifest_path = Path("pip-src/app/src/main/AndroidManifest.xml")
+manifest = manifest_path.read_text(encoding="utf-8")
+if "android:usesCleartextTraffic=" not in manifest:
+    manifest = replace_once(manifest, "<application\n", '<application\n        android:usesCleartextTraffic="true"\n', "allow private-LAN HTTP to PC backend")
+    manifest_path.write_text(manifest, encoding="utf-8")
+print("Optional PC-hosted Ollama brain integrated into Android chat; local inference remains the default.")
