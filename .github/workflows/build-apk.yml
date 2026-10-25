@@ -304,10 +304,7 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot -memory 1536
           script: |
-            timeout 12m gradle -p pip-src -PpipEmulatorTests=true connectedDebugAndroidTest --no-daemon || {
-              adb logcat -d -t 800 || true
-              exit 1
-            }
+            timeout 12m gradle -p pip-src -PpipEmulatorTests=true connectedDebugAndroidTest --no-daemon
 
       - name: APK prüfen
         run: |
