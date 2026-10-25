@@ -59,12 +59,12 @@ jobs:
           print("\n".join(line for line in s.splitlines() if "versionCode" in line or "versionName" in line))
           s2, n = re.subn(r'versionCode\s+\d+', 'versionCode 22', s, count=1)
           if n != 1:
-              raise SystemExit("versionCode konnte nicht sicher auf 18 gesetzt werden")
+              raise SystemExit("versionCode konnte nicht sicher auf 22 gesetzt werden")
           s2, n = re.subn(r'versionName\s+["\'][^"\']+["\']', 'versionName "1.0.8"', s2, count=1)
           if n != 1:
-              raise SystemExit("versionName konnte nicht sicher auf 1.0.5 gesetzt werden")
+              raise SystemExit("versionName konnte nicht sicher auf 1.0.8 gesetzt werden")
           p.write_text(s2, encoding="utf-8")
-          print("Android-Updateversion: 1.0.6 (versionCode 21)")
+          print("Android-Updateversion: 1.0.8 (versionCode 22)")
           PY
 
       - name: Pips Persönlichkeit erweitern
@@ -239,6 +239,9 @@ jobs:
       - name: Pip-Funktionen gemeinsam integrieren
         run: python3 .github/scripts/integrate-pip.py
 
+      - name: Pip-Komponenten sicher verbinden
+        run: python3 .github/scripts/patch-pip-quality.py
+
       - name: Pip-Quellcode und Funktionen prüfen
         run: |
           echo "=== Projektdateien ==="
@@ -258,63 +261,6 @@ jobs:
           echo "=== Wakeword-/Modell-Referenzen ==="
           grep -RniE 'wake.?word|hey pip|VoiceInteractionService|sherpa|supertonic|qwen|gguf|model.*download|SpeechRecognizer|TextToSpeech' pip-src/app/src 2>/dev/null | head -n 240 || true
 
-      - name: Hey-Pip-Wakeword-Modell einbinden
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          mkdir -p pip-src/app/src/main/assets/hey_pip
-          curl --fail --silent --show-error -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/workflows/train-hey-pip.yml/runs?status=success&per_page=10" -o /tmp/runs.json
-          RUN_ID="$(python3 -c 'import json; d=json.load(open("/tmp/runs.json")); print(next(r["id"] for r in d["workflow_runs"] if r["conclusion"]=="success"))')"
-          curl --fail --silent --show-error -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/artifacts" -o /tmp/artifacts.json
-          ARTIFACT_ID="$(python3 -c 'import json; d=json.load(open("/tmp/artifacts.json")); print(next(a["id"] for a in d["artifacts"] if a["name"]=="Hey-Pip-Wakeword-Model"))')"
-          curl --fail --location --retry 3 -H "Authorization: Bearer $GH_TOKEN" \
-            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID/zip" -o /tmp/hey-pip.zip
-          unzip -oq /tmp/hey-pip.zip -d pip-src/app/src/main/assets/hey_pip
-          test -s pip-src/app/src/main/assets/hey_pip/wake.int8.onnx
-          test -s pip-src/app/src/main/assets/hey_pip/wake.json
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path("pip-src/app/build.gradle")
-          s = p.read_text()
-          dep = "    implementation 'com.microsoft.onnxruntime:onnxruntime-android:1.20.0'\n"
-          if dep.strip() not in s:
-              s = s.replace("dependencies {\n", "dependencies {\n" + dep, 1)
-          p.write_text(s)
-          print("ONNX Runtime Android und Hey-Pip-Modell sind im APK-Projekt vorbereitet.")
-          PY
-
-      - name: Doppelte ONNX-Nativbibliothek auflösen
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path("pip-src/app/build.gradle")
-          s = p.read_text()
-          block = """
-          android {
-              packaging {
-                  jniLibs {
-                      pickFirsts += [
-                          'lib/arm64-v8a/libonnxruntime.so',
-                          'lib/armeabi-v7a/libonnxruntime.so',
-                          'lib/x86/libonnxruntime.so',
-                          'lib/x86_64/libonnxruntime.so'
-                      ]
-                  }
-              }
-          }
-          """
-          if "pickFirsts += [" not in s:
-              # Insert packaging configuration into the existing android block.
-              marker = "    compileOptions {"
-              if marker not in s:
-                  raise SystemExit("Android-Block nicht gefunden")
-              s = s.replace(marker, block + "\n" + marker, 1)
-          p.write_text(s)
-          print("Gradle löst doppelte libonnxruntime.so-Dateien über pickFirsts auf.")
-          PY
-
       - name: Fehlende Sherpa-ONNX-Bibliothek ergänzen
         run: |
           mkdir -p pip-src/app/libs
@@ -323,6 +269,9 @@ jobs:
             --output pip-src/app/libs/sherpa-onnx-1.13.7.aar
           test -s pip-src/app/libs/sherpa-onnx-1.13.7.aar
           ls -lh pip-src/app/libs/sherpa-onnx-1.13.7.aar
+
+      - name: Integrierte Pip-Verträge statisch testen
+        run: python3 .github/scripts/test-pip-source.py
 
       - name: Integrierten Quellstand vor dem Build sichern
         uses: actions/upload-artifact@v4
