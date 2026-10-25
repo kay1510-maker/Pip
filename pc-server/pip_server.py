@@ -2,6 +2,7 @@
 """Pip PC brain: local Ollama proxy and SQLite memory; Python standard library only."""
 from __future__ import annotations
 import json, os, re, secrets, sqlite3, time, urllib.error, urllib.request
+from contextlib import closing
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -66,7 +67,7 @@ class Handler(BaseHTTPRequestHandler):
         if not self.authorized():
             self.send_json(401, {"error": "Bearer token fehlt oder ist falsch."}); return
         if self.path == "/memories":
-            with connect() as con:
+            with closing(connect()) as con:
                 rows = con.execute("SELECT id,content,created_at FROM memories ORDER BY id DESC LIMIT 200").fetchall()
             self.send_json(200, {"memories": [dict(r) for r in rows]}); return
         self.send_json(404, {"error": "Unbekannter Endpunkt."})
@@ -76,7 +77,7 @@ class Handler(BaseHTTPRequestHandler):
         match = re.fullmatch(r"/memories/(\d+)", self.path)
         if not match:
             self.send_json(404, {"error": "Unbekannter Endpunkt."}); return
-        with connect() as con:
+        with closing(connect()) as con:
             cur = con.execute("DELETE FROM memories WHERE id=?", (int(match.group(1)),)); con.commit()
         self.send_json(200, {"deleted": cur.rowcount > 0})
     def do_POST(self):
@@ -99,13 +100,13 @@ class Handler(BaseHTTPRequestHandler):
             if explicit:
                 fact = explicit.group(1).strip()[:500]
                 reply = f"Mach ich. Ich merk mir: {fact}"
-                with connect() as con:
+                with closing(connect()) as con:
                     con.execute("INSERT INTO memories(content,created_at) VALUES (?,?)", (fact, int(time.time())))
                     con.execute("INSERT INTO messages(session_id,role,content,created_at) VALUES (?,?,?,?)", (session_id,"user",user_text,int(time.time())))
                     con.execute("INSERT INTO messages(session_id,role,content,created_at) VALUES (?,?,?,?)", (session_id,"assistant",reply,int(time.time())))
                     con.commit()
                 self.send_json(200, {"reply": reply, "memory_saved": True}); return
-            with connect() as con:
+            with closing(connect()) as con:
                 mem = con.execute("SELECT content FROM memories ORDER BY id DESC LIMIT 30").fetchall()
                 history = con.execute("SELECT role,content FROM messages WHERE session_id=? ORDER BY id DESC LIMIT ?", (session_id,MAX_HISTORY)).fetchall()
                 history = list(reversed(history))
@@ -118,7 +119,7 @@ class Handler(BaseHTTPRequestHandler):
             reply = ollama_chat(messages)
             if not reply:
                 raise RuntimeError("Ollama hat eine leere Antwort zurückgegeben.")
-            with connect() as con:
+            with closing(connect()) as con:
                 con.execute("INSERT INTO messages(session_id,role,content,created_at) VALUES (?,?,?,?)", (session_id,"assistant",reply,int(time.time())))
                 con.execute("DELETE FROM messages WHERE session_id=? AND id NOT IN (SELECT id FROM messages WHERE session_id=? ORDER BY id DESC LIMIT 300)", (session_id,session_id))
                 con.commit()
