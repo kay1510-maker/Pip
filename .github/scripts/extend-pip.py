@@ -201,3 +201,34 @@ d = replace_once(d, "import android.database.Cursor;\n",
     "add history imports")
 db_path.write_text(d, encoding="utf-8")
 print("Pip-Integration erweitert: sichtbarer Verlauf, bearbeitbare Erinnerungen und abschaltbare Sprachausgabe.")
+
+
+# Explicit "Merk dir ..." commands create user-controlled long-term memories.
+s = main_path.read_text(encoding="utf-8")
+s = replace_once(
+    s,
+    """        appendHistory("Kay", q)
+        if (model == null) {""",
+    """        appendHistory("Kay", q)
+        val memoryMatch = Regex("""(?i)^(?:pip[, ]*)?(?:merk dir|merke dir|bitte merk dir|bitte merke dir)\s*[:,\-]?\s*(.+)$""").find(q)
+        val explicitMemory = memoryMatch?.groupValues?.getOrNull(1)?.trim()?.takeIf { it.isNotBlank() }?.take(500)
+        if (explicitMemory != null) {
+            val reply = "Mach ich. Ich merk mir: $explicitMemory"
+            db.remember("Von dir gemerkt", explicitMemory, 3)
+            db.remember("Gespräch", "Nutzer: $q | Pip: $reply", 1)
+            db.pruneConversationLog(500)
+            output.text = reply
+            status.text = "Erinnerung gespeichert."
+            appendHistory("Pip", reply)
+            if (getSharedPreferences("pip_settings", MODE_PRIVATE).getBoolean("speech_enabled", true)) {
+                try { tts.speak(reply, TextToSpeech.QUEUE_FLUSH, null, "pip") } catch (_: Throwable) { }
+            }
+            input.setText("")
+            return
+        }
+        if (model == null) {""",
+    "add explicit long-term memory command"
+)
+main_path.write_text(s, encoding="utf-8")
+print("Expliziter Merker-Befehl integriert.")
+
