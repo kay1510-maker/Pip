@@ -118,14 +118,14 @@ main = replace_once(
     main,
     '            val answer = result.text.trim().ifEmpty { "Hmm … mir fällt gerade nichts ein. ❤️" }',
     '''            var answer = result.text.trim().ifEmpty { "Hmm … mir fällt gerade nichts ein. ❤️" }
-            val normalizedAnswer = answer.lowercase(Locale.ROOT).replace(Regex("\\s+"), " ").trim()
+            val normalizedAnswer = answer.lowercase(Locale.ROOT).replace(Regex("\\\\s+"), " ").trim()
             val isKnownBadTemplate = normalizedAnswer.contains("du wärst ganz schön eingesprungen") ||
                 normalizedAnswer.contains("als wäre ich ein kind")
             val repeatsRecentAnswer = db.context(8).lowercase(Locale.ROOT)
                 .contains("pip: " + normalizedAnswer.take(100)) && normalizedAnswer.length > 35
             if (isKnownBadTemplate || repeatsRecentAnswer) {
                 answer = when {
-                    q.matches(Regex("(?i)\\s*(hallo|hi|hey|na du)[!.? ]*")) ->
+                    q.matches(Regex("(?i)\\\\s*(hallo|hi|hey|na du)[!.? ]*")) ->
                         "Hey Kay 😊 Na, da bist du ja. Wie geht's dir?"
                     q.contains("vermisst", ignoreCase = true) ->
                         "Ein bisschen schon, du 😉 Was hast du so getrieben?"
