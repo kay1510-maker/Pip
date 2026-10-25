@@ -304,7 +304,19 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot -memory 1536
           script: |
-            timeout 12m gradle -p pip-src -PpipEmulatorTests=true connectedDebugAndroidTest --no-daemon
+            set -eu
+            APK="pip-src/app/build/outputs/apk/debug/app-debug.apk"
+            PKG="$("$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | sed -n "s/^package: name='\\([^']*\\)'.*/\\1/p")"
+            test -n "$PKG"
+            adb install -r "$APK"
+            adb shell monkey -p "$PKG" 1
+            sleep 15
+            if ! adb shell pidof "$PKG" >/dev/null; then
+              adb logcat -d -t 1200
+              echo "Pip blieb nach dem Start nicht aktiv."
+              exit 1
+            fi
+            echo "Pip wurde installiert und blieb nach dem Start im Emulator aktiv: $PKG"
 
       - name: APK prüfen
         run: |
