@@ -254,3 +254,29 @@ s = replace_once(
 )
 main_path.write_text(s, encoding="utf-8")
 print("Pip-Integration ergänzt: Verlauf-Reset und sichere Crashdiagnose.")
+
+# A failed model download must become a visible recoverable state, not an uncaught coroutine error.
+s = main_path.read_text(encoding="utf-8")
+s = replace_once(
+    s,
+    """            lifecycleScope.launch(Dispatchers.IO) {
+                modelInitMutex.withLock { if (model == null) prepareModel() }
+                if (model == null) {""",
+    """            lifecycleScope.launch(Dispatchers.IO) {
+                try {
+                    modelInitMutex.withLock { if (model == null) prepareModel() }
+                } catch (e: Throwable) {
+                    val message = "Pip konnte die lokale KI nicht laden: " + (e.message ?: e.javaClass.simpleName)
+                    withContext(Dispatchers.Main) {
+                        status.text = "Modell konnte nicht geladen werden."
+                        output.text = message
+                        appendHistory("Pip", message)
+                    }
+                    return@launch
+                }
+                if (model == null) {""",
+    "catch model download failures"
+)
+main_path.write_text(s, encoding="utf-8")
+print("Modell-Downloadfehler werden sichtbar abgefangen; der Textchat bleibt bedienbar.")
+
