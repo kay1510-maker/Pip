@@ -256,6 +256,9 @@ pc_new = r"""            val answer = json.optString("reply", "").trim()
             }"""
 main = replace_once(main, pc_old, pc_new, "use Android TTS for PC replies")
 
+if "import kotlinx.coroutines.cancel" not in main:
+    main = replace_once(main, "import kotlinx.coroutines.Dispatchers\n", "import kotlinx.coroutines.Dispatchers\nimport kotlinx.coroutines.cancel\n", "import lifecycle cancellation")
+
 # Explicit "remember this" requests are saved locally first, then mirrored to the PC only when that backend is enabled.
 memory_start = main.index("        val memoryMatch = Regex(")
 route_marker = '        if (getSharedPreferences("pip_settings", MODE_PRIVATE).getBoolean("pc_backend_enabled", false)) {'
