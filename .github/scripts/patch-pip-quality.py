@@ -270,4 +270,181 @@ gradle = gradle_path.read_text(encoding="utf-8")
 gradle = re.sub(r"^\s*implementation ['\"]com\.microsoft\.onnxruntime:onnxruntime-android:[^'\"]+['\"]\s*\n", "", gradle, flags=re.M)
 gradle_path.write_text(gradle, encoding="utf-8")
 
-print("Pip-Qualitätsintegration angewendet: Kontexttrennung, ASR-Fehlerbehandlung, konfigurierbare Opt-in-Erinnerungen; Wakeword bleibt bis zum Gerätetest deaktiviert.")
+
+# Remove the unused Android VoiceInteractionService stub as well; no wakeword feature is advertised.
+manifest = manifest_path.read_text(encoding="utf-8")
+manifest, _ = re.subn(
+    r"\s*<service\s+android:name=\"\.PipVoiceInteractionService\".*?</service>",
+    "",
+    manifest,
+    count=1,
+    flags=re.S,
+)
+manifest_path.write_text(manifest, encoding="utf-8")
+voice_java = BASE / "PipVoiceInteractionService.java"
+if voice_java.exists():
+    voice_java.unlink()
+voice_xml = Path("pip-src/app/src/main/res/xml/voice_interaction_service.xml")
+if voice_xml.exists():
+    voice_xml.unlink()
+
+# Add real Android instrumentation tests. The emulator test property adds x86_64 only for CI tests.
+gradle = gradle_path.read_text(encoding="utf-8")
+gradle = replace_once(
+    gradle,
+    "        applicationId 'de.pip.companion'\n",
+    "        applicationId 'de.pip.companion'\n        testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'\n",
+    "configure Android instrumentation runner",
+)
+gradle = replace_once(
+    gradle,
+    "        ndk { abiFilters 'arm64-v8a' }",
+    """        ndk {
+            if (project.hasProperty("pipEmulatorTests")) {
+                abiFilters 'arm64-v8a', 'x86_64'
+            } else {
+                abiFilters 'arm64-v8a'
+            }
+        }""",
+    "allow x86_64 only during emulator tests",
+)
+if "androidTestImplementation 'androidx.test:runner:1.6.2'" not in gradle:
+    gradle = replace_once(
+        gradle,
+        "dependencies {\n",
+        """dependencies {
+    androidTestImplementation 'androidx.test:runner:1.6.2'
+    androidTestImplementation 'androidx.test:rules:1.6.1'
+    androidTestImplementation 'androidx.test:core:1.6.1'
+    androidTestImplementation 'androidx.test.ext:junit:1.2.1'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.6.1'
+""",
+        "add Android instrumentation test dependencies",
+    )
+gradle_path.write_text(gradle, encoding="utf-8")
+
+test_dir = Path("pip-src/app/src/androidTest/java/de/pip/companion")
+test_dir.mkdir(parents=True, exist_ok=True)
+db_test = r"""package de.pip.companion;
+
+import android.content.Context;
+import android.database.Cursor;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
+import androidx.test.platform.app.InstrumentationRegistry;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import static org.junit.Assert.*;
+
+@RunWith(AndroidJUnit4.class)
+public class PipMemoryDbInstrumentedTest {
+    private Context context;
+    private PipMemoryDb db;
+
+    @Before public void setUp() {
+        context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        context.deleteDatabase("pip_memory.db");
+        db = new PipMemoryDb(context);
+    }
+
+    @After public void tearDown() {
+        if (db != null) db.close();
+        if (context != null) context.deleteDatabase("pip_memory.db");
+    }
+
+    @Test public void longTermMemoryAndRecentDialogueBothEnterContext() {
+        db.remember("Vorliebe", "Kaffee", 3);
+        db.remember("Gespräch", "Nutzer: Magst du Kaffee? | Pip: Klar.", 1);
+        String contextText = db.context(12);
+        assertTrue(contextText.contains("Wichtige Erinnerungen:"));
+        assertTrue(contextText.contains("Vorliebe: Kaffee"));
+        assertTrue(contextText.contains("Letzte Gespräche:"));
+        assertTrue(contextText.contains("Magst du Kaffee?"));
+    }
+
+    @Test public void memoryCanBeEditedDeletedAndReset() {
+        db.remember("Vorliebe", "Tee", 3);
+        Cursor cursor = db.listMemories();
+        assertTrue(cursor.moveToFirst());
+        long id = cursor.getLong(0);
+        cursor.close();
+
+        db.updateMemory(id, "Vorliebe", "Kaffee");
+        assertTrue(db.context(12).contains("Vorliebe: Kaffee"));
+        db.deleteMemory(id);
+        assertFalse(db.context(12).contains("Vorliebe: Kaffee"));
+
+        db.remember("Hinweis", "Zum Zurücksetzen", 3);
+        db.clearMemories();
+        assertFalse(db.context(12).contains("Zum Zurücksetzen"));
+    }
+
+    @Test public void memoriesSurviveHelperRecreation() {
+        db.remember("Hinweis", "Persistenz", 3);
+        db.close();
+        db = new PipMemoryDb(context);
+        assertTrue(db.context(12).contains("Hinweis: Persistenz"));
+    }
+}
+"""
+(test_dir / "PipMemoryDbInstrumentedTest.java").write_text(db_test, encoding="utf-8")
+ui_test = r"""package de.pip.companion;
+
+import android.Manifest;
+import android.content.Context;
+import androidx.test.core.app.ActivityScenario;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
+import androidx.test.platform.app.InstrumentationRegistry;
+import androidx.test.rule.GrantPermissionRule;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import static androidx.test.espresso.Espresso.onView;
+import static androidx.test.espresso.action.ViewActions.click;
+import static androidx.test.espresso.assertion.ViewAssertions.matches;
+import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
+import static androidx.test.espresso.matcher.ViewMatchers.withText;
+import static org.junit.Assert.assertFalse;
+
+@RunWith(AndroidJUnit4.class)
+public class PipUiInstrumentedTest {
+    private Context context;
+
+    @Rule
+    public final GrantPermissionRule microphonePermission =
+        GrantPermissionRule.grant(Manifest.permission.RECORD_AUDIO);
+
+    @Before public void resetPreferences() {
+        context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        context.getSharedPreferences("pip_settings", Context.MODE_PRIVATE).edit().clear().commit();
+        context.deleteDatabase("pip_memory.db");
+    }
+
+    @Test public void settingsControlSpeechAndExposeOptInReminderOptions() {
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            onView(withText("⚙ Einstellungen & Gedächtnis")).perform(click());
+            onView(withText("Gesprächsstil anpassen")).perform(click());
+            onView(withText("Antworten laut vorlesen")).check(matches(isDisplayed())).perform(click());
+            onView(withText("Speichern")).perform(click());
+            assertFalse(context.getSharedPreferences("pip_settings", Context.MODE_PRIVATE)
+                .getBoolean("speech_enabled", true));
+
+            onView(withText("⚙ Einstellungen & Gedächtnis")).perform(click());
+            onView(withText("Benachrichtigungen außerhalb der App")).perform(click());
+            onView(withText("Pip-Benachrichtigungen")).check(matches(isDisplayed()));
+            onView(withText("Häufigkeit")).check(matches(isDisplayed()));
+            onView(withText("Ruhezeit beginnt")).check(matches(isDisplayed()));
+            onView(withText("Ruhezeit endet")).check(matches(isDisplayed()));
+            onView(withText("Aktivieren")).check(matches(isDisplayed()));
+            assertFalse(context.getSharedPreferences("pip_settings", Context.MODE_PRIVATE)
+                .getBoolean("notifications_enabled", false));
+        }
+    }
+}
+"""
+(test_dir / "PipUiInstrumentedTest.java").write_text(ui_test, encoding="utf-8")
+
+print("Pip-Qualitätsintegration angewendet: Gedächtnis, Sprache, Opt-in-Erinnerungen; Wakeword bleibt bis zum Gerätetest deaktiviert.")
+

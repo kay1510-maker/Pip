@@ -31,6 +31,15 @@ checks = {
     "notification permission declared": 'android.permission.POST_NOTIFICATIONS' in manifest,
 }
 
+
+test_root = Path("pip-src/app/src/androidTest/java/de/pip/companion")
+checks.update({
+    "memory instrumentation tests generated": (test_root / "PipMemoryDbInstrumentedTest.java").exists(),
+    "UI instrumentation tests generated": (test_root / "PipUiInstrumentedTest.java").exists(),
+    "Android instrumentation runner configured": "androidx.test.runner.AndroidJUnitRunner" in gradle,
+    "voice interaction stub is not shipped": "PipVoiceInteractionService" not in manifest and not (JAVA / "PipVoiceInteractionService.java").exists(),
+})
+
 failed = [name for name, passed in checks.items() if not passed]
 for name, passed in checks.items():
     print(f'{"PASS" if passed else "FAIL"}: {name}')
