@@ -256,6 +256,76 @@ pc_new = r"""            val answer = json.optString("reply", "").trim()
             }"""
 main = replace_once(main, pc_old, pc_new, "use Android TTS for PC replies")
 
+# Explicit "remember this" requests are saved locally first, then mirrored to the PC only when that backend is enabled.
+memory_start = main.index("        val memoryMatch = Regex(")
+route_marker = '        if (getSharedPreferences("pip_settings", MODE_PRIVATE).getBoolean("pc_backend_enabled", false)) {'
+memory_end = main.index(route_marker, memory_start)
+if memory_start < 0 or memory_end < 0:
+    raise SystemExit("Could not locate the explicit-memory branch before PC routing")
+memory_block = r"""        val memoryMatch = Regex("(?i)^(?:pip[, ]*)?(?:merk dir|merke dir|bitte merk dir|bitte merke dir)\\s*[:,\\-]?\\s*(.+)$").find(q)
+        val explicitMemory = memoryMatch?.groupValues?.getOrNull(1)?.trim()?.takeIf { it.isNotBlank() }?.take(500)
+        if (explicitMemory != null) {
+            db.remember("Von dir gemerkt", explicitMemory, 3)
+            if (getSharedPreferences("pip_settings", MODE_PRIVATE).getBoolean("pc_backend_enabled", false)) {
+                output.text = "Ich speichere mir das auch auf dem PC …"
+                status.text = "Erinnerung lokal gespeichert; PC-Synchronisierung läuft …"
+                lifecycleScope.launch(Dispatchers.IO) { askWithPc(q) }
+                return
+            }
+            val reply = "Mach ich. Ich merk mir: " + explicitMemory
+            db.remember("Gespräch", "Nutzer: " + q + " | Pip: " + reply, 1)
+            db.pruneConversationLog(500)
+            output.text = reply
+            status.text = "Erinnerung gespeichert."
+            appendHistory("Pip", reply)
+            if (getSharedPreferences("pip_settings", MODE_PRIVATE).getBoolean("speech_enabled", true)) {
+                try { tts.speak(reply, TextToSpeech.QUEUE_FLUSH, null, "pip") } catch (_: Throwable) { }
+            }
+            return
+        }
+"""
+main = main[:memory_start] + memory_block + main[memory_end:]
+
+# Never send the PC bearer token to a public host or an unsupported URL scheme.
+pc_connection_marker = '            conn = URL(base + "/chat").openConnection() as HttpURLConnection'
+main = replace_once(
+    main,
+    pc_connection_marker,
+    """            val endpoint = URL(base)
+            if (endpoint.protocol != "http" && endpoint.protocol != "https") {
+                throw IllegalArgumentException("Die PC-Adresse muss mit http:// oder https:// beginnen.")
+            }
+            val address = java.net.InetAddress.getByName(endpoint.host)
+            if (!address.isLoopbackAddress && !address.isSiteLocalAddress && !address.isLinkLocalAddress) {
+                throw IllegalArgumentException("Nur private oder lokale PC-Adressen sind erlaubt.")
+            }
+""" + pc_connection_marker,
+    "restrict PC backend to private addresses",
+)
+main = main.replace(
+    "Ich erreiche mein PC-Gehirn gerade nicht. Prüfe, ob der Server läuft und die Adresse stimmt. ($e)",
+    "Ich erreiche das PC-Gehirn gerade nicht. Prüfe Server, Token und private Netzwerkadresse. Lokale Erinnerungen bleiben auf dem Handy gespeichert."
+)
+
+# Cancel in-flight work and release recognizer, TTS and SQLite resources when the activity is destroyed.
+if "override fun onDestroy()" not in main:
+    main = replace_once(
+        main,
+        "    private fun buildUi() {",
+        """    override fun onDestroy() {
+        try { lifecycleScope.cancel() } catch (_: Throwable) { }
+        try { recognizer?.cancel(); recognizer?.destroy() } catch (_: Throwable) { }
+        recognizer = null
+        try { tts.stop(); tts.shutdown() } catch (_: Throwable) { }
+        try { db.close() } catch (_: Throwable) { }
+        super.onDestroy()
+    }
+
+    private fun buildUi() {""",
+        "release activity resources",
+    )
+
+
 main_path.write_text(main, encoding="utf-8")
 
 # Quiet hours are evaluated in the device's local time; if the periodic job lands in the quiet window, skip it.

@@ -115,25 +115,10 @@ Nach jedem Schritt wird der integrierte Projektstand gebaut und getestet, bevor 
 
 ## 12. Aktueller Status und nächster notwendiger Schritt
 
-### Bereits umgesetzt und im Build geprüft
-- Der separate Branch `pip-spec-2026-10-25` und eine Draft-PR halten `main` unverändert.
-- Der Quellstand wurde über den GitHub-Actions-Build entpackt und als Prüfartefakt untersucht; die bestehende Patch-Kette ist nun in getrennte, nachvollziehbare Integrationsskripte gegliedert.
-- Die gemeinsame App enthält jetzt: längeren Modellkontext und ausführlichere Antworten, einstellbare Gesprächsintensitäten, wählbare deutsche Android-TTS-Stimme, ein anpassbares Profil mit Name/Avatar, sichtbaren Gesprächsverlauf, bearbeitbare und löschbare Langzeiterinnerungen, den Chatbefehl „Merk dir …“, eine Abschaltung der Sprachausgabe und optionale tägliche Benachrichtigungen (standardmäßig aus).
-- Modellstartfehler werden abgefangen; Gesprächsverlauf wird begrenzt, damit die lokale Datenbank nicht unbegrenzt wächst.
-- Der letzte erfolgreiche GitHub-Actions-Lauf ist [Run 40174975129](https://github.com/kay1510-maker/Pip/actions/runs/40174975129). Build und APK-Prüfung waren erfolgreich; das Artefakt heißt `Pip-APK-Integrated`.
-
-### PC-Gehirn: erster Backend-Schritt angelegt
-- Unter `pc-server/` liegt nun ein Python-Backend für Windows, das mit dem bereits vorgesehenen lokalen Ollama-Modell `qwen3:4b` über die lokale Chat-API spricht.
-- Es bietet einen token-geschützten Chat-Endpunkt und lokale SQLite-Speicherung für Verlauf und ausdrücklich angeforderte Erinnerungen (`Merk dir …`).
-- Die Backend-Dateien sind im Branch; sie sind noch nicht mit der Android-App verbunden und wurden noch nicht auf dem Windows-PC ausgeführt. Die LAN-Verbindung wird erst nach Einrichtung des Tokens und der privaten Windows-Firewall-Regel getestet.
-- Die Bildgenerierung ist bewusst ein separater nächster Baustein: optional lokaler Bildserver (z. B. ComfyUI) am PC, Avatar-Konsistenz und nur ausdrücklich erlaubte Bildtypen. Proaktive Bildzustellung muss opt-in und abschaltbar sein.
-
-### Noch nicht als fertig bestätigt
-- Die APK wurde automatisiert gebaut und geprüft, aber noch nicht auf einem realen Android-Gerät gestartet und durchgetestet.
-- Antwortqualität, tatsächliche Modell-Ladezeit, RAM-Verbrauch, TTS-Klang, Mikrofonberechtigungen und Benachrichtigungen müssen auf dem Zielgerät geprüft werden.
-- Die Supertonic-Sprachausgabe bleibt vorsichtshalber deaktiviert, weil sie in früheren Versionen Abstürze verursachte; aktuell wird die Android-System-TTS mit auswählbarer deutscher Stimme verwendet.
-- „Hey Pip“ ist noch nicht als zuverlässig funktionierende Freisprechfunktion bestätigt und darf nicht als fertig beworben werden.
-- `main` wird erst nach erfolgreicher Prüfung und Freigabe geändert.
-
-### Nächster Schritt
-Die gebaute APK auf dem Zielgerät installieren und den vereinbarten Testablauf durchgehen: erster Start und Modell-Download, mehrere deutsche Gespräche, gespeicherte Erinnerung nach Neustart, Bearbeiten/Löschen, TTS an/aus, Stimme wechseln, Benachrichtigung explizit aktivieren/deaktivieren und Verhalten bei fehlender Verbindung. Erst danach werden konkrete Fehler in derselben Integrationsbasis korrigiert.
+- Arbeitsbranch: `pip-spec-2026-10-25`; `main` bleibt unverändert.
+- Die Android-Integration umfasst lokale Qwen-Inferenz, getrennte Langzeit-Erinnerungen und letzte Gespräche, editierbare/löschbare lokale Erinnerungen, gespeicherte Android-TTS-Stimme, fehlertolerante On-Device-Spracherkennung und optionale Erinnerungen mit Frequenz/Ruhezeit.
+- Der PC-Ollama-Pfad ist im Arbeitsbranch optional eingebunden; lokale Inferenz bleibt Standard. PC-Antworten nutzen Android-TTS. Explizite Erinnerungen werden lokal gespeichert und bei aktiviertem PC-Modus zusätzlich an den PC gespiegelt. Der Client soll nur private/lokale PC-Adressen ansprechen; HTTP bleibt im LAN unverschlüsselt und darf nicht ins Internet freigegeben werden.
+- Das unverbundene Hey-Pip-Wakeword und der ungenutzte Android-VoiceInteractionService werden nicht als fertige Funktionen ausgeliefert. Mikrofonaufnahme bleibt ausdrücklich durch den Nutzer gestartet.
+- Buildlauf 170 hatte die APK-Erzeugung und statischen Quellvertragstests bestanden. Die nachfolgenden Emulatorläufe 174/175 waren bei der letzten Prüfung noch im Schritt `Pip-Funktionstests auf Android-Emulator`; deshalb ist die integrierte Version **noch nicht als vollständig getestet** markiert.
+- Neu hinzugefügte Android-Instrumentierungstests prüfen Gedächtnis-Kontext/Persistenz/Bearbeiten/Löschen sowie die UI für Sprachschalter und freiwillige Erinnerungen. PC-Server-Tests prüfen Authentifizierung, Chat-Kontext, Erinnerungen, Löschung und Fehlerpfade ohne echtes Ollama.
+- **Nächster Schritt:** laufende Android-Emulatorläufe abwarten und alle Fehler beheben; danach PC-Server-Tests und Build erneut prüfen. Erst nach bestandenen Tests ist noch ein realer Telefon-/LAN-Test für Mikrofon, TTS, lokalen Modellstart und PC-Verbindung nötig. Kein Merge nach `main` ohne diese Freigabe.

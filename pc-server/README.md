@@ -31,3 +31,11 @@ Alle Endpunkte außer /health benötigen Authorization: Bearer DEIN_TOKEN. Chat-
 - Erinnerungen liegen lokal in pip_memory.sqlite3. Der Befehl "Merk dir ..." speichert ausdrücklich einen Fakt.
 - Chatantworten nutzen Ollamas lokale /api/chat-Schnittstelle mit stream=false.
 - Dies ist der Backend-Grundstein, noch nicht die vollständige Verbindung mit der Handy-App. Bildgenerierung, Avatar-Anzeige und proaktive Bildzustellung kommen in späteren Schritten.
+
+
+## Sicherheitshinweise
+
+- Die Android-App akzeptiert für den PC-Endpunkt nur Loopback-, private oder Link-Local-Adressen.
+- HTTP im Heimnetz ist unverschlüsselt: Das Bearer-Token kann im selben Netzwerk mitgeschnitten werden. Nur in einem vertrauenswürdigen privaten Netz verwenden.
+- Port 8765 niemals direkt ins Internet freigeben; Firewall auf das Heimnetz beschränken.
+- Der PC-Modus bleibt standardmäßig ausgeschaltet. Die lokale Erinnerung auf dem Handy bleibt auch bei fehlgeschlagener PC-Synchronisierung erhalten.

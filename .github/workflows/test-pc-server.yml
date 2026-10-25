@@ -1,24 +1,29 @@
-name: Test Pip PC backend
+name: Test Pip PC server
 
 on:
   push:
-    branches: [main, pip-spec-2026-10-25]
+    branches: [ main ]
     paths:
-      - "pc-server/**"
-      - ".github/workflows/test-pc-server.yml"
+      - 'pc-server/**'
+      - '.github/workflows/test-pc-server.yml'
   pull_request:
-    branches: [main]
+    branches: [ main ]
     paths:
-      - "pc-server/**"
-      - ".github/workflows/test-pc-server.yml"
+      - 'pc-server/**'
+      - '.github/workflows/test-pc-server.yml'
+
+permissions:
+  contents: read
 
 jobs:
-  python-check:
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
-      - name: Check Python syntax
-        run: python -m py_compile pc-server/pip_server.py
+          python-version: '3.12'
+      - name: Syntax prüfen
+        run: python -m py_compile pc-server/pip_server.py pc-server/test_pip_server.py
+      - name: API, Authentifizierung, Gedächtnis und Fehlerpfade testen
+        run: python -m unittest discover -s pc-server -p 'test_*.py' -v

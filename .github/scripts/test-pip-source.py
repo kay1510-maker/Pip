@@ -53,6 +53,14 @@ checks.update({
     "PC replies use Android TTS rather than disabled Supertonic": (
         'tts.speak(displayAnswer' in main and "speakWithSupertonic(answer)" not in main
     ),
+
+    "PC endpoint restricted to private/local addresses": all(x in main for x in ("isLoopbackAddress", "isSiteLocalAddress", "isLinkLocalAddress")),
+    "PC memory sync is opt-in and follows local save": (
+        'db.remember("Von dir gemerkt", explicitMemory, 3)' in ask_source
+        and ask_source.index('db.remember("Von dir gemerkt", explicitMemory, 3)') < ask_source.index("askWithPc(q)")
+        and 'getBoolean("pc_backend_enabled", false)' in ask_source
+    ),
+    "activity cleans up TTS and database": all(x in main for x in ("override fun onDestroy()", "tts.shutdown()", "db.close()")),
 })
 
 failed = [name for name, passed in checks.items() if not passed]
