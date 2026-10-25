@@ -203,7 +203,7 @@ s = replace_once(
     """        appendHistory("Kay", q)
         if (model == null) {""",
     """        appendHistory("Kay", q)
-        val memoryMatch = Regex("""(?i)^(?:pip[, ]*)?(?:merk dir|merke dir|bitte merk dir|bitte merke dir)\s*[:,\-]?\s*(.+)$""").find(q)
+        val memoryMatch = Regex("(?i)^(?:pip[, ]*)?(?:merk dir|merke dir|bitte merk dir|bitte merke dir)\\\\s*[:, -]?\\\\s*(.+)$").find(q)
         val explicitMemory = memoryMatch?.groupValues?.getOrNull(1)?.trim()?.takeIf { it.isNotBlank() }?.take(500)
         if (explicitMemory != null) {
             val reply = "Mach ich. Ich merk mir: $explicitMemory"
