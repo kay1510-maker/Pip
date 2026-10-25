@@ -613,8 +613,8 @@ s = replace_once(s, "    private fun showPipSettings() {", """    private fun sh
     private fun showPipSettings() {""", "add PC brain client and settings")
 s = replace_once(
     s,
-    '        if (model == null) {\n            output.text = "Pip bereitet sich vor … ❤️"\n            lifecycleScope.launch(Dispatchers.IO) {',
-    '        if (getSharedPreferences("pip_settings", MODE_PRIVATE).getBoolean("pc_backend_enabled", false)) {\n            output.text = "Pip denkt auf dem PC nach … ❤️"\n            lifecycleScope.launch(Dispatchers.IO) { askWithPc(q) }\n            return\n        }\n        if (model == null) {\n            output.text = "Pip bereitet sich vor … ❤️"\n            lifecycleScope.launch(Dispatchers.IO) {',
+    '        if (model == null) {\n            output.text = "Pip bereitet sich vor … ❤️"\n            lifecycleScope.launch(Dispatchers.IO) {\n                try {',
+    '        if (getSharedPreferences("pip_settings", MODE_PRIVATE).getBoolean("pc_backend_enabled", false)) {\n            output.text = "Pip denkt auf dem PC nach … ❤️"\n            lifecycleScope.launch(Dispatchers.IO) { askWithPc(q) }\n            return\n        }\n        if (model == null) {\n            output.text = "Pip bereitet sich vor … ❤️"\n            lifecycleScope.launch(Dispatchers.IO) {\n                try {',
     "route chat to PC after explicit memory commands"
 )
 main_path.write_text(s, encoding="utf-8")
