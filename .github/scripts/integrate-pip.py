@@ -3,6 +3,7 @@ from pathlib import Path
 BASE = Path("pip-src/app/src/main/java/de/pip/companion")
 main_path = BASE / "MainActivity.kt"
 db_path = BASE / "PipMemoryDb.java"
+gradle_path = Path("pip-src/app/build.gradle")
 
 def replace_once(text, old, new, label):
     count = text.count(old)
@@ -141,7 +142,9 @@ s = replace_once(s, "    private suspend fun prepareModel() {", """    private f
 
     private suspend fun prepareModel() {""", "add memory and personality settings")
 
-s = replace_once(s, "implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.9.3'\n", "implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.9.3'\n    implementation 'androidx.work:work-runtime-ktx:2.10.1'\n", "add notification scheduling dependency")
+g = gradle_path.read_text(encoding="utf-8")
+g = replace_once(g, "implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.9.3'\n", "implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.9.3'\n    implementation 'androidx.work:work-runtime-ktx:2.10.1'\n", "add notification scheduling dependency")
+gradle_path.write_text(g, encoding="utf-8")
 s = replace_once(s, 'val options = arrayOf("Gesprächsstil anpassen", "Gespeicherte Erinnerungen ansehen / löschen", "Alle Erinnerungen zurücksetzen")', 'val options = arrayOf("Gesprächsstil anpassen", "Gespeicherte Erinnerungen ansehen / löschen", "Alle Erinnerungen zurücksetzen", "Benachrichtigungen außerhalb der App")', "add notification settings")
 s = replace_once(s, '                    2 -> AlertDialog.Builder(this)\n                        .setTitle("Gedächtnis zurücksetzen?")\n                        .setMessage("Alle lokal gespeicherten Gesprächserinnerungen werden gelöscht. Das kann nicht rückgängig gemacht werden.")\n                        .setNegativeButton("Abbrechen", null)\n                        .setPositiveButton("Alles löschen") { _, _ ->\n                            db.clearMemories()\n                            status.text = "Gedächtnis zurückgesetzt."\n                        }\n                        .show()\n                }', '                    2 -> AlertDialog.Builder(this)\n                        .setTitle("Gedächtnis zurücksetzen?")\n                        .setMessage("Alle lokal gespeicherten Gesprächserinnerungen werden gelöscht. Das kann nicht rückgängig gemacht werden.")\n                        .setNegativeButton("Abbrechen", null)\n                        .setPositiveButton("Alles löschen") { _, _ ->\n                            db.clearMemories()\n                            status.text = "Gedächtnis zurückgesetzt."\n                        }\n                        .show()\n                    3 -> showNotificationSettings()\n                }', "wire notification settings")
 s = replace_once(s, '        } else if (requestCode == 10) {\n            status.text = "Mikrofonzugriff fehlt. Du kannst Pip weiterhin schreiben."\n        }\n    }', '        } else if (requestCode == 10) {\n            status.text = "Mikrofonzugriff fehlt. Du kannst Pip weiterhin schreiben."\n        } else if (requestCode == 11) {\n            val prefs = getSharedPreferences("pip_settings", MODE_PRIVATE)\n            val granted = grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED\n            prefs.edit().putBoolean("notifications_pending", false).putBoolean("notifications_enabled", granted).apply()\n            if (granted) {\n                scheduleDailyNotification()\n                status.text = "Tägliche Pip-Erinnerung aktiviert."\n            } else {\n                status.text = "Benachrichtigungen bleiben ausgeschaltet."\n            }\n        }\n    }', "handle notification permission result")
