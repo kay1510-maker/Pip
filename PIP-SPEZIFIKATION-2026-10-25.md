@@ -115,7 +115,19 @@ Nach jedem Schritt wird der integrierte Projektstand gebaut und getestet, bevor 
 
 ## 12. Aktueller Status und nächster notwendiger Schritt
 
-- Der separate Branch `pip-spec-2026-10-25` wurde aus `main` erstellt.
-- Das frühere Spezifikationsdokument wurde zu diesem Masterplan erweitert.
-- Das Quellarchiv und der Workflow sind identifiziert, aber der Inhalt der ZIP-Dateien wurde noch nicht vollständig entpackt und zeilenweise geprüft.
-- Daher ist **noch keine vollständige Integration der App-Funktionen behauptet**. Der nächste technische Schritt ist, den tatsächlichen Quelltext und die Build-Ausgabe zugänglich zu machen, die Patch-Kette zu prüfen und anschließend die Gesamtänderung in einem nachvollziehbaren Integrationsstand umzusetzen.
+### Bereits umgesetzt und im Build geprüft
+- Der separate Branch `pip-spec-2026-10-25` und eine Draft-PR halten `main` unverändert.
+- Der Quellstand wurde über den GitHub-Actions-Build entpackt und als Prüfartefakt untersucht; die bestehende Patch-Kette ist nun in getrennte, nachvollziehbare Integrationsskripte gegliedert.
+- Die gemeinsame App enthält jetzt: längeren Modellkontext und ausführlichere Antworten, einstellbare Gesprächsintensitäten, wählbare deutsche Android-TTS-Stimme, ein anpassbares Profil mit Name/Avatar, sichtbaren Gesprächsverlauf, bearbeitbare und löschbare Langzeiterinnerungen, den Chatbefehl „Merk dir …“, eine Abschaltung der Sprachausgabe und optionale tägliche Benachrichtigungen (standardmäßig aus).
+- Modellstartfehler werden abgefangen; Gesprächsverlauf wird begrenzt, damit die lokale Datenbank nicht unbegrenzt wächst.
+- Der letzte erfolgreiche GitHub-Actions-Lauf ist [Run 40174975129](https://github.com/kay1510-maker/Pip/actions/runs/40174975129). Build und APK-Prüfung waren erfolgreich; das Artefakt heißt `Pip-APK-Integrated`.
+
+### Noch nicht als fertig bestätigt
+- Die APK wurde automatisiert gebaut und geprüft, aber noch nicht auf einem realen Android-Gerät gestartet und durchgetestet.
+- Antwortqualität, tatsächliche Modell-Ladezeit, RAM-Verbrauch, TTS-Klang, Mikrofonberechtigungen und Benachrichtigungen müssen auf dem Zielgerät geprüft werden.
+- Die Supertonic-Sprachausgabe bleibt vorsichtshalber deaktiviert, weil sie in früheren Versionen Abstürze verursachte; aktuell wird die Android-System-TTS mit auswählbarer deutscher Stimme verwendet.
+- „Hey Pip“ ist noch nicht als zuverlässig funktionierende Freisprechfunktion bestätigt und darf nicht als fertig beworben werden.
+- `main` wird erst nach erfolgreicher Prüfung und Freigabe geändert.
+
+### Nächster Schritt
+Die gebaute APK auf dem Zielgerät installieren und den vereinbarten Testablauf durchgehen: erster Start und Modell-Download, mehrere deutsche Gespräche, gespeicherte Erinnerung nach Neustart, Bearbeiten/Löschen, TTS an/aus, Stimme wechseln, Benachrichtigung explizit aktivieren/deaktivieren und Verhalten bei fehlender Verbindung. Erst danach werden konkrete Fehler in derselben Integrationsbasis korrigiert.
