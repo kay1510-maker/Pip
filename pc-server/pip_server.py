@@ -16,6 +16,10 @@ TOKEN = os.environ.get("PIP_TOKEN", "").strip()
 MAX_BODY, MAX_HISTORY = 64 * 1024, 16
 PROACTIVE_AFTER_HOURS = int(os.environ.get("PIP_PROACTIVE_AFTER_HOURS", "24"))
 PROACTIVE_COOLDOWN_HOURS = int(os.environ.get("PIP_PROACTIVE_COOLDOWN_HOURS", "24"))
+COMFYUI_URL = os.environ.get("PIP_COMFYUI_URL", "http://127.0.0.1:8188").rstrip("/")
+COMFYUI_CHECKPOINT = os.environ.get("PIP_COMFYUI_CHECKPOINT", "").strip()
+IMAGE_WIDTH = int(os.environ.get("PIP_IMAGE_WIDTH", "512"))
+IMAGE_HEIGHT = int(os.environ.get("PIP_IMAGE_HEIGHT", "512"))
 SYSTEM_PROMPT = """Du bist Pip, eine erwachsene, deutschsprachige virtuelle Freundin.
 Du sprichst warm, natürlich, persönlich, humorvoll und ungezwungen – niemals wie ein Kundendienst.
 Du darfst Gespräche gelegentlich selbst vertiefen und dich auf tatsächlich gespeicherte Informationen
@@ -38,6 +42,53 @@ def connect():
 
 def encoded(obj):
     return json.dumps(obj, ensure_ascii=False).encode("utf-8")
+
+def comfy_request(path, payload=None, timeout=30):
+    data = None if payload is None else encoded(payload)
+    headers = {} if data is None else {"Content-Type": "application/json"}
+    req = urllib.request.Request(COMFYUI_URL + path, data=data, headers=headers, method="GET" if data is None else "POST")
+    with urllib.request.urlopen(req, timeout=timeout) as response:
+        return response.read()
+
+def generate_local_image(prompt_text, negative_text):
+    if not COMFYUI_CHECKPOINT:
+        raise RuntimeError("PIP_COMFYUI_CHECKPOINT ist nicht gesetzt. Setze den exakten Dateinamen des installierten Checkpoints.")
+    workflow = {
+        "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": COMFYUI_CHECKPOINT}},
+        "2": {"class_type": "CLIPTextEncode", "inputs": {"text": prompt_text, "clip": ["1", 1]}},
+        "3": {"class_type": "CLIPTextEncode", "inputs": {"text": negative_text, "clip": ["1", 1]}},
+        "4": {"class_type": "EmptyLatentImage", "inputs": {"width": IMAGE_WIDTH, "height": IMAGE_HEIGHT, "batch_size": 1}},
+        "5": {"class_type": "KSampler", "inputs": {"seed": secrets.randbits(48), "steps": 22, "cfg": 7.0, "sampler_name": "euler", "scheduler": "normal", "denoise": 1.0, "model": ["1", 0], "positive": ["2", 0], "negative": ["3", 0], "latent_image": ["4", 0]}},
+        "6": {"class_type": "VAEDecode", "inputs": {"samples": ["5", 0], "vae": ["1", 2]}},
+        "7": {"class_type": "SaveImage", "inputs": {"filename_prefix": "Pip/notification", "images": ["6", 0]}}
+    }
+    queued = json.loads(comfy_request("/prompt", {"prompt": workflow, "client_id": "pip-local-server"}, timeout=30).decode("utf-8"))
+    prompt_id = queued.get("prompt_id")
+    if not prompt_id:
+        raise RuntimeError("ComfyUI hat keine prompt_id zurückgegeben: " + str(queued)[:500])
+    deadline = time.time() + 300
+    while time.time() < deadline:
+        time.sleep(2)
+        history_raw = comfy_request("/history/" + prompt_id, timeout=20)
+        history = json.loads(history_raw.decode("utf-8"))
+        entry = history.get(prompt_id)
+        if not entry:
+            continue
+        outputs = entry.get("outputs", {})
+        for node in outputs.values():
+            for image_item in node.get("images", []):
+                filename = image_item.get("filename")
+                subfolder = image_item.get("subfolder", "")
+                image_type = image_item.get("type", "output")
+                query = urllib.parse.urlencode({"filename": filename, "subfolder": subfolder, "type": image_type})
+                image_bytes = comfy_request("/view?" + query, timeout=60)
+                if image_bytes[:8] != b"\\x89PNG\\r\\n\\x1a\\n":
+                    raise RuntimeError("ComfyUI lieferte keine gültige PNG-Datei.")
+                return image_bytes
+        status = entry.get("status", {})
+        if status.get("status_str") == "error":
+            raise RuntimeError("ComfyUI konnte das Bild nicht erzeugen. Prüfe den ComfyUI-Konsolenfehler.")
+    raise TimeoutError("Die Bildgenerierung dauerte länger als 5 Minuten.")
 
 def ollama_chat(messages):
     req = urllib.request.Request(OLLAMA_URL, data=encoded({
@@ -69,6 +120,24 @@ class Handler(BaseHTTPRequestHandler):
             return
         if not self.authorized():
             self.send_json(401, {"error": "Bearer token fehlt oder ist falsch."}); return
+        if self.path == "/image":
+            # Prompt is generated live from saved memories and recent chat; image rendering stays on local ComfyUI.
+            try:
+                with closing(connect()) as con:
+                    memories = con.execute("SELECT content FROM memories ORDER BY id DESC LIMIT 20").fetchall()
+                    recent = con.execute("SELECT role,content FROM messages ORDER BY id DESC LIMIT 8").fetchall()
+                memory_text = "\\n".join("- " + row["content"] for row in memories) or "Noch keine gespeicherten Erinnerungen."
+                recent_text = "\\n".join(row["role"] + ": " + row["content"] for row in reversed(recent))
+                prompt = SYSTEM_PROMPT + "\\nErstelle eine neue Bildbeschreibung für Pip, eine erwachsene Frau, die in allen Bildern als dieselbe virtuelle Person gedacht ist. Nutze nur passende Hinweise aus Erinnerungen und Gesprächen. Wähle eine natürliche, nicht explizite Alltagsszene, Kleidung, Ausdruck und Umgebung selbst. Schreibe einen detaillierten englischen Stable-Diffusion-Prompt, ohne Namen, ohne Text im Bild und ohne Behauptung, dass ein Referenzbild existiert. Gib ausschließlich den Prompt aus.\\nErinnerungen:\\n" + memory_text + "\\nLetzter Gesprächskontext:\\n" + recent_text
+                image_prompt = ollama_chat([{"role": "system", "content": prompt}, {"role": "user", "content": "Erstelle jetzt eine frische individuelle Bildidee für Pip."}])
+                if not image_prompt:
+                    raise RuntimeError("Qwen hat keinen Bildprompt erstellt.")
+                png = generate_local_image(image_prompt[:3000], "low quality, blurry, deformed hands, extra fingers, text, watermark, logo")
+                import base64
+                self.send_json(200, {"ready": True, "mime_type": "image/png", "image_base64": base64.b64encode(png).decode("ascii"), "prompt": image_prompt, "generated_live": True})
+            except Exception as exc:
+                self.send_json(503, {"ready": False, "error": "Pip konnte kein lokales Bild erzeugen.", "detail": str(exc)[:500]})
+            return
         if self.path == "/memories":
             with closing(connect()) as con:
                 rows = con.execute("SELECT id,content,created_at FROM memories ORDER BY id DESC LIMIT 200").fetchall()
