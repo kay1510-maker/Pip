@@ -287,7 +287,7 @@ memory_block = r"""        val memoryMatch = Regex("(?i)^(?:pip[, ]*)?(?:merk di
 main = main[:memory_start] + memory_block + main[memory_end:]
 
 # Never send the PC bearer token to a public host or an unsupported URL scheme.
-pc_connection_marker = '            conn = URL(base + "/chat").openConnection() as HttpURLConnection'
+pc_connection_marker = '            conn = (URL("$base/chat").openConnection() as HttpURLConnection).apply {'
 main = replace_once(
     main,
     pc_connection_marker,
