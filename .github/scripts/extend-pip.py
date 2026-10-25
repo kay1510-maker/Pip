@@ -28,7 +28,7 @@ s = replace_once(s,
         }
         historyScroll = ScrollView(this).apply {
             isFillViewport = true
-            addView(historyView, ScrollView.LayoutParams(-1, -2))
+            addView(historyView, FrameLayout.LayoutParams(-1, -2))
         }
         root.addView(historyScroll, LinearLayout.LayoutParams(-1, 0, 1f))""",
     "show persistent transcript")
