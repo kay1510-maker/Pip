@@ -490,3 +490,10 @@ print("Pip-Integration ergänzt: Verlauf-Reset und sichere Crashdiagnose.")
 
 
 
+
+
+# Remove the unused wake-word service; no functional wake-word detection is shipped.
+unused_wakeword = BASE / "PipListeningService.kt"
+if unused_wakeword.exists():
+    unused_wakeword.unlink()
+    print("Removed unused wake-word service source.")
