@@ -44,15 +44,16 @@ s = replace_once(s, "    private fun showPipSettings() {",
 
     private fun showPipSettings() {""",
     "add transcript helper")
-s = replace_once(s,
-    """        val q = text.trim()
+s = if 'appendHistory("Kay", q)' not in s:
+    replace_once(s,
+        """        val q = text.trim()
         if (q.isEmpty()) return
         if (model == null) {""",
-    """        val q = text.trim()
+        """        val q = text.trim()
         if (q.isEmpty()) return
         appendHistory("Kay", q)
         if (model == null) {""",
-    "append user message")
+        "append user message")
 s = replace_once(s,
     "            withContext(Dispatchers.Main) { output.text = displayAnswer }\n",
     "            withContext(Dispatchers.Main) { output.text = displayAnswer; appendHistory(\"Pip\", displayAnswer) }\n",
