@@ -202,6 +202,7 @@ s = replace_once(s, "    private fun showVoiceSettings() {", "    private fun sh
 main_path.write_text(s, encoding="utf-8")
 
 d = db_path.read_text(encoding="utf-8")
+d = replace_once(d, "        Cursor r=getReadableDatabase().rawQuery(\"SELECT closeness,stage FROM relationship WHERE id=1\",null);\n        if(r.moveToFirst()) s.append(\"Beziehungsstufe: \").append(r.getString(1)).append(\" (\").append(r.getInt(0)).append(\"/100)\\n\");\n        r.close();\n", "", "remove stale message-count relationship stage from prompt context")
 d = replace_once(d, "    public void develop(int amount){", """    public Cursor listMemories(){
         return getReadableDatabase().rawQuery(
           "SELECT id,category,content FROM memories ORDER BY created DESC LIMIT 200", null);
