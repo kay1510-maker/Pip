@@ -62,16 +62,8 @@ s = replace_once(s, "        val ids = ArrayList<Long>()\n        val labels = A
     "        val ids = ArrayList<Long>()\n        val categories = ArrayList<String>()\n        val contents = ArrayList<String>()\n        val labels = ArrayList<String>()",
     "memory edit arrays")
 s = replace_once(s,
-    """            ids.add(cursor.getLong(0))
-            val category = cursor.getString(1) ?: "Erinnerung"
-            val content = cursor.getString(2) ?: ""
-            labels.add("$category: $content".replace("\\n", " ").take(180))""",
-    """            ids.add(cursor.getLong(0))
-            val category = cursor.getString(1) ?: "Erinnerung"
-            val content = cursor.getString(2) ?: ""
-            categories.add(category)
-            contents.add(content)
-            labels.add("$category: $content".replace("\\n", " ").take(180))""",
+    '            labels.add("$category: $content".replace(',
+    '            categories.add(category)\n            contents.add(content)\n            labels.add("$category: $content".replace(',
     "store memory edit values")
 s = replace_once(s, '.setTitle("Erinnerung antippen, um sie zu löschen")',
     '.setTitle("Erinnerung antippen, um sie zu bearbeiten")',
