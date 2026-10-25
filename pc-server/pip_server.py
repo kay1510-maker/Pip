@@ -14,6 +14,8 @@ HOST = os.environ.get("PIP_HOST", "0.0.0.0")
 PORT = int(os.environ.get("PIP_PORT", "8765"))
 TOKEN = os.environ.get("PIP_TOKEN", "").strip()
 MAX_BODY, MAX_HISTORY = 64 * 1024, 16
+PROACTIVE_AFTER_HOURS = int(os.environ.get("PIP_PROACTIVE_AFTER_HOURS", "24"))
+PROACTIVE_COOLDOWN_HOURS = int(os.environ.get("PIP_PROACTIVE_COOLDOWN_HOURS", "24"))
 SYSTEM_PROMPT = """Du bist Pip, eine erwachsene, deutschsprachige virtuelle Freundin.
 Du sprichst warm, natürlich, persönlich, humorvoll und ungezwungen – niemals wie ein Kundendienst.
 Du darfst Gespräche gelegentlich selbst vertiefen und dich auf tatsächlich gespeicherte Informationen
@@ -30,6 +32,7 @@ def connect():
     con.row_factory = sqlite3.Row
     con.execute("CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY AUTOINCREMENT, session_id TEXT NOT NULL, role TEXT NOT NULL, content TEXT NOT NULL, created_at INTEGER NOT NULL)")
     con.execute("CREATE TABLE IF NOT EXISTS memories (id INTEGER PRIMARY KEY AUTOINCREMENT, content TEXT NOT NULL, created_at INTEGER NOT NULL)")
+    con.execute("CREATE TABLE IF NOT EXISTS proactive_notifications (id INTEGER PRIMARY KEY AUTOINCREMENT, content TEXT NOT NULL, created_at INTEGER NOT NULL, delivered INTEGER NOT NULL DEFAULT 0)")
     con.commit()
     return con
 
@@ -70,6 +73,35 @@ class Handler(BaseHTTPRequestHandler):
             with closing(connect()) as con:
                 rows = con.execute("SELECT id,content,created_at FROM memories ORDER BY id DESC LIMIT 200").fetchall()
             self.send_json(200, {"memories": [dict(r) for r in rows]}); return
+        if self.path == "/proactive":
+            now = int(time.time())
+            with closing(connect()) as con:
+                pending = con.execute("SELECT id,content,created_at FROM proactive_notifications WHERE delivered=0 ORDER BY id LIMIT 1").fetchone()
+                if pending:
+                    self.send_json(200, {"ready": True, "id": pending["id"], "message": pending["content"], "created_at": pending["created_at"]}); return
+                last_user = con.execute("SELECT MAX(created_at) FROM messages WHERE role='user'").fetchone()[0]
+                last_proactive = con.execute("SELECT MAX(created_at) FROM proactive_notifications").fetchone()[0]
+                if last_user is None or now - int(last_user) < max(1, PROACTIVE_AFTER_HOURS) * 3600:
+                    self.send_json(200, {"ready": False, "reason": "not_long_enough"}); return
+                if last_proactive is not None and now - int(last_proactive) < max(1, PROACTIVE_COOLDOWN_HOURS) * 3600:
+                    self.send_json(200, {"ready": False, "reason": "cooldown"}); return
+                memories = con.execute("SELECT content FROM memories ORDER BY id DESC LIMIT 20").fetchall()
+                recent = con.execute("SELECT role,content FROM messages ORDER BY id DESC LIMIT 8").fetchall()
+            memory_text = "\n".join("- " + row["content"] for row in memories) or "Noch keine gespeicherten Erinnerungen."
+            recent_text = "\n".join(row["role"] + ": " + row["content"] for row in reversed(recent))
+            prompt = SYSTEM_PROMPT + "\nDu darfst eine kurze, liebevolle Nachricht aus eigener Initiative verfassen, weil längere Zeit kein Gespräch stattfand. Dränge nicht, mache keine Schuldgefühle und behaupte keine echten menschlichen Gefühle als Tatsache. Nutze Erinnerungen nur, wenn sie passen. Antworte ausschließlich mit der Nachricht, auf Deutsch, maximal 2 Sätze.\nErinnerungen:\n" + memory_text + "\nLetzter Gesprächskontext:\n" + recent_text
+            try:
+                message = ollama_chat([{"role": "system", "content": prompt}, {"role": "user", "content": "Schreibe jetzt eine persönliche Nachricht, mit der Pip sich nach längerer Funkstille von sich aus meldet."}])
+                message = message.strip().strip('"')
+                if not message:
+                    raise RuntimeError("Ollama hat keine proaktive Nachricht erzeugt.")
+                with closing(connect()) as con:
+                    cur = con.execute("INSERT INTO proactive_notifications(content,created_at,delivered) VALUES (?,?,0)", (message, now))
+                    con.commit()
+                    item_id = cur.lastrowid
+                self.send_json(200, {"ready": True, "id": item_id, "message": message, "created_at": now}); return
+            except Exception as exc:
+                self.send_json(503, {"ready": False, "error": "Proaktive Nachricht konnte nicht erzeugt werden.", "detail": str(exc)}); return
         self.send_json(404, {"error": "Unbekannter Endpunkt."})
     def do_DELETE(self):
         if not self.authorized():
@@ -83,6 +115,19 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         if not self.authorized():
             self.send_json(401, {"error": "Bearer token fehlt oder ist falsch."}); return
+        if self.path == "/proactive/ack":
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+                if length < 2 or length > 1024:
+                    self.send_json(400, {"error": "Ungültige Bestätigung."}); return
+                data = json.loads(self.rfile.read(length).decode("utf-8"))
+                item_id = int(data.get("id", 0))
+                with closing(connect()) as con:
+                    cur = con.execute("UPDATE proactive_notifications SET delivered=1 WHERE id=?", (item_id,))
+                    con.commit()
+                self.send_json(200, {"acknowledged": cur.rowcount > 0}); return
+            except (ValueError, json.JSONDecodeError):
+                self.send_json(400, {"error": "Ungültige Bestätigung."}); return
         if self.path != "/chat":
             self.send_json(404, {"error": "Unbekannter Endpunkt."}); return
         try:
