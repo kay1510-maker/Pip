@@ -15,26 +15,6 @@ def replace_once(text, old, new, label):
         raise SystemExit(f"{label}: expected exactly one match, found {count}; refusing unsafe patch")
     return text.replace(old, new, 1)
 
-# Wakeword listening is not exposed until it is reliable and tested on a real device.
-main = main_path.read_text(encoding="utf-8")
-main, n = re.subn(
-    r"    override fun onResume\(\) \{\s*super\.onResume\(\)\s*// Voice input is started only by the microphone button; this prevents it stealing text input focus\.\s*stopService\(Intent\(this, PipListeningService::class\.java\)\)\s*\}\s*",
-    "",
-    main,
-    count=1,
-    flags=re.S,
-)
-if n == 0 and "PipListeningService" in main:
-    raise SystemExit("Could not safely remove the unused wakeword-service reference")
-main = main.replace("tts.speak(answer, TextToSpeech.QUEUE_FLUSH, null, \"pip\")",
-                    "tts.speak(displayAnswer, TextToSpeech.QUEUE_FLUSH, null, \"pip\")")
-# Clear the edit field only after capturing the submitted text; this also covers speech-recognized input.
-main = replace_once(
-    main,
-    '        val q = text.trim()\n        if (q.isEmpty()) return\n        appendHistory("Kay", q)',
-    '        val q = text.trim()\n        if (q.isEmpty()) return\n        input.setText("")\n        appendHistory("Kay", q)',
-    "clear submitted chat input",
-)
 # Bound and separate the two context sources so important saved memories are not displaced by chat logs.
 old_context = r"""    public String context(int limit){
         StringBuilder s=new StringBuilder();
@@ -67,14 +47,18 @@ new_context = r"""    public String context(int limit){
             if(content != null && !content.trim().isEmpty()) recent.add(content.trim());
         }
         conversations.close();
-        Collections.reverse(recent);
-        if(!recent.isEmpty()) result.append("Letzte Gespräche:\n");
+        ArrayList<String> selected = new ArrayList<>();
+        int remaining = Math.max(0, 1800 - result.length() - 24);
         for(String row : recent){
             String line = row.replace("\n"," ").trim();
             if(line.length() > 170) line = line.substring(0,170) + "…";
-            if(result.length() + line.length() > 1800) break;
-            result.append("- ").append(line).append("\n");
+            if(line.length() + 3 > remaining) break;
+            selected.add(line);
+            remaining -= line.length() + 3;
         }
+        Collections.reverse(selected);
+        if(!selected.isEmpty()) result.append("Letzte Gespräche:\n");
+        for(String line : selected) result.append("- ").append(line).append("\n");
         return result.toString();
     }"""
 db = db_path.read_text(encoding="utf-8")
@@ -88,6 +72,25 @@ new_prompt = "Gedächtnis und letzte Gespräche: " + "$" + "{context.take(1800)}
 if main.count(old_prompt) != 1:
     raise SystemExit("Prompt context insertion point not unique")
 main = main.replace(old_prompt, new_prompt, 1)
+
+main, n = re.subn(
+    r"    override fun onResume\(\) \{\s*super\.onResume\(\)\s*// Voice input is started only by the microphone button; this prevents it stealing text input focus\.\s*stopService\(Intent\(this, PipListeningService::class\.java\)\)\s*\}\s*",
+    "",
+    main,
+    count=1,
+    flags=re.S,
+)
+if n == 0 and "PipListeningService" in main:
+    raise SystemExit("Could not safely remove the unused wakeword-service reference")
+main = main.replace("tts.speak(answer, TextToSpeech.QUEUE_FLUSH, null, \"pip\")",
+                    "tts.speak(displayAnswer, TextToSpeech.QUEUE_FLUSH, null, \"pip\")")
+main = replace_once(
+    main,
+    '        val q = text.trim()\n        if (q.isEmpty()) return\n        appendHistory("Kay", q)',
+    '        val q = text.trim()\n        if (q.isEmpty()) return\n        input.setText("")\n        appendHistory("Kay", q)',
+    "clear submitted chat input",
+)
+
 
 # SpeechRecognizer creation/startup can throw on devices without a usable offline German service.
 pattern = r"    private fun startListening\(\) \{.*?\n    \}\n\n    override fun onInit\(statusCode: Int\) \{"
