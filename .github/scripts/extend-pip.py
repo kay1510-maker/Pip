@@ -198,10 +198,11 @@ print("Pip-Integration erweitert: sichtbarer Verlauf, bearbeitbare Erinnerungen 
 
 # Explicit "Merk dir ..." commands create user-controlled long-term memories.
 s = main_path.read_text(encoding="utf-8")
-s = replace_once(
-    s,
-    "        if (model == null) {",
-    """        val memoryMatch = Regex("(?i)^(?:pip[, ]*)?(?:merk dir|merke dir|bitte merk dir|bitte merke dir)\\\\s*[:, -]?\\\\s*(.+)$").find(q)
+memory_anchor = '        appendHistory("Kay", q)\n'
+if memory_anchor not in s:
+    raise SystemExit("Explicit memory insertion point not found")
+memory_code = """        appendHistory("Kay", q)
+        val memoryMatch = Regex("(?i)^(?:pip[, ]*)?(?:merk dir|merke dir|bitte merk dir|bitte merke dir)\\\\s*[:,\\\\-]?\\\\s*(.+)$").find(q)
         val explicitMemory = memoryMatch?.groupValues?.getOrNull(1)?.trim()?.takeIf { it.isNotBlank() }?.take(500)
         if (explicitMemory != null) {
             val reply = "Mach ich. Ich merk mir: $explicitMemory"
@@ -217,8 +218,7 @@ s = replace_once(
             input.setText("")
             return
         }
-        if (model == null) {""",
-    "add explicit long-term memory command"
-)
+"""
+s = s.replace(memory_anchor, memory_code, 1)
 main_path.write_text(s, encoding="utf-8")
 print("Expliziter Merker-Befehl integriert.")
