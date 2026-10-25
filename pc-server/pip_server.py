@@ -32,7 +32,7 @@ def connect():
     con.row_factory = sqlite3.Row
     con.execute("CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY AUTOINCREMENT, session_id TEXT NOT NULL, role TEXT NOT NULL, content TEXT NOT NULL, created_at INTEGER NOT NULL)")
     con.execute("CREATE TABLE IF NOT EXISTS memories (id INTEGER PRIMARY KEY AUTOINCREMENT, content TEXT NOT NULL, created_at INTEGER NOT NULL)")
-    con.execute("CREATE TABLE IF NOT EXISTS proactive_notifications (id INTEGER PRIMARY KEY AUTOINCREMENT, content TEXT NOT NULL, created_at INTEGER NOT NULL, delivered INTEGER NOT NULL DEFAULT 0)")
+    con.execute("CREATE TABLE IF NOT EXISTS proactive_state (id INTEGER PRIMARY KEY CHECK (id=1), last_sent INTEGER NOT NULL DEFAULT 0)")
     con.commit()
     return con
 
@@ -74,32 +74,30 @@ class Handler(BaseHTTPRequestHandler):
                 rows = con.execute("SELECT id,content,created_at FROM memories ORDER BY id DESC LIMIT 200").fetchall()
             self.send_json(200, {"memories": [dict(r) for r in rows]}); return
         if self.path == "/proactive":
+            # Generate the message live on this request; persist only the cooldown timestamp,
+            # never a prewritten or pending message queue.
             now = int(time.time())
             with closing(connect()) as con:
-                pending = con.execute("SELECT id,content,created_at FROM proactive_notifications WHERE delivered=0 ORDER BY id LIMIT 1").fetchone()
-                if pending:
-                    self.send_json(200, {"ready": True, "id": pending["id"], "message": pending["content"], "created_at": pending["created_at"]}); return
                 last_user = con.execute("SELECT MAX(created_at) FROM messages WHERE role='user'").fetchone()[0]
-                last_proactive = con.execute("SELECT MAX(created_at) FROM proactive_notifications").fetchone()[0]
+                row = con.execute("SELECT last_sent FROM proactive_state WHERE id=1").fetchone()
+                last_proactive = row["last_sent"] if row else 0
                 if last_user is None or now - int(last_user) < max(1, PROACTIVE_AFTER_HOURS) * 3600:
                     self.send_json(200, {"ready": False, "reason": "not_long_enough"}); return
-                if last_proactive is not None and now - int(last_proactive) < max(1, PROACTIVE_COOLDOWN_HOURS) * 3600:
+                if last_proactive and now - int(last_proactive) < max(1, PROACTIVE_COOLDOWN_HOURS) * 3600:
                     self.send_json(200, {"ready": False, "reason": "cooldown"}); return
                 memories = con.execute("SELECT content FROM memories ORDER BY id DESC LIMIT 20").fetchall()
                 recent = con.execute("SELECT role,content FROM messages ORDER BY id DESC LIMIT 8").fetchall()
-            memory_text = "\n".join("- " + row["content"] for row in memories) or "Noch keine gespeicherten Erinnerungen."
-            recent_text = "\n".join(row["role"] + ": " + row["content"] for row in reversed(recent))
-            prompt = SYSTEM_PROMPT + "\nDu darfst eine kurze, liebevolle Nachricht aus eigener Initiative verfassen, weil längere Zeit kein Gespräch stattfand. Dränge nicht, mache keine Schuldgefühle und behaupte keine echten menschlichen Gefühle als Tatsache. Nutze Erinnerungen nur, wenn sie passen. Antworte ausschließlich mit der Nachricht, auf Deutsch, maximal 2 Sätze.\nErinnerungen:\n" + memory_text + "\nLetzter Gesprächskontext:\n" + recent_text
+            memory_text = "\\n".join("- " + row["content"] for row in memories) or "Noch keine gespeicherten Erinnerungen."
+            recent_text = "\\n".join(row["role"] + ": " + row["content"] for row in reversed(recent))
+            prompt = SYSTEM_PROMPT + "\\nVerfasse jetzt selbst eine kurze, persönliche Nachricht, weil längere Zeit kein Gespräch stattfand. Die Nachricht muss aus dem aktuellen Kontext und den Erinnerungen entstehen; verwende keine feste Vorlage und wiederhole keine Standardfloskel. Du darfst sagen, dass du ihn vermisst hast, wenn es natürlich passt, ohne Druck oder Schuldgefühle zu erzeugen. Antworte ausschließlich auf Deutsch und mit höchstens 2 Sätzen.\\nErinnerungen:\\n" + memory_text + "\\nLetzter Gesprächskontext:\\n" + recent_text
             try:
-                message = ollama_chat([{"role": "system", "content": prompt}, {"role": "user", "content": "Schreibe jetzt eine persönliche Nachricht, mit der Pip sich nach längerer Funkstille von sich aus meldet."}])
-                message = message.strip().strip('"')
+                message = ollama_chat([{"role": "system", "content": prompt}, {"role": "user", "content": "Formuliere eine neue Nachricht, die Pip ihm jetzt aus eigener Initiative schreiben würde."}]).strip().strip('"')
                 if not message:
-                    raise RuntimeError("Ollama hat keine proaktive Nachricht erzeugt.")
+                    raise RuntimeError("Ollama hat keine persönliche Nachricht erzeugt.")
                 with closing(connect()) as con:
-                    cur = con.execute("INSERT INTO proactive_notifications(content,created_at,delivered) VALUES (?,?,0)", (message, now))
+                    con.execute("INSERT INTO proactive_state(id,last_sent) VALUES (1,?) ON CONFLICT(id) DO UPDATE SET last_sent=excluded.last_sent", (now,))
                     con.commit()
-                    item_id = cur.lastrowid
-                self.send_json(200, {"ready": True, "id": item_id, "message": message, "created_at": now}); return
+                self.send_json(200, {"ready": True, "message": message, "created_at": now, "generated_live": True}); return
             except Exception as exc:
                 self.send_json(503, {"ready": False, "error": "Proaktive Nachricht konnte nicht erzeugt werden.", "detail": str(exc)}); return
         self.send_json(404, {"error": "Unbekannter Endpunkt."})
@@ -115,19 +113,6 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         if not self.authorized():
             self.send_json(401, {"error": "Bearer token fehlt oder ist falsch."}); return
-        if self.path == "/proactive/ack":
-            try:
-                length = int(self.headers.get("Content-Length", "0"))
-                if length < 2 or length > 1024:
-                    self.send_json(400, {"error": "Ungültige Bestätigung."}); return
-                data = json.loads(self.rfile.read(length).decode("utf-8"))
-                item_id = int(data.get("id", 0))
-                with closing(connect()) as con:
-                    cur = con.execute("UPDATE proactive_notifications SET delivered=1 WHERE id=?", (item_id,))
-                    con.commit()
-                self.send_json(200, {"acknowledged": cur.rowcount > 0}); return
-            except (ValueError, json.JSONDecodeError):
-                self.send_json(400, {"error": "Ungültige Bestätigung."}); return
         if self.path != "/chat":
             self.send_json(404, {"error": "Unbekannter Endpunkt."}); return
         try:
