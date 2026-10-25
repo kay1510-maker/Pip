@@ -10,12 +10,10 @@ if (-not $env:PIP_TOKEN) {
     Write-Host "Kopiere ihn sicher weg. Er wird beim Schließen des Fensters nicht automatisch gespeichert."
 }
 if (-not $env:PIP_MODEL) { $env:PIP_MODEL = "qwen3:4b" }
-if (-not $env:PIP_COMFYUI_URL) { $env:PIP_COMFYUI_URL = "http://127.0.0.1:8188" }
-if (-not $env:PIP_COMFYUI_CHECKPOINT) {
-    $env:PIP_COMFYUI_CHECKPOINT = "v1-5-pruned-emaonly-fp16.safetensors"
-}
-if (-not $env:PIP_IMAGE_WIDTH) { $env:PIP_IMAGE_WIDTH = "512" }
-if (-not $env:PIP_IMAGE_HEIGHT) { $env:PIP_IMAGE_HEIGHT = "512" }
+# Text-only setup: no ComfyUI required.
+if (-not $env:PIP_NUM_GPU) { $env:PIP_NUM_GPU = "0" }
+if (-not $env:PIP_NUM_CTX) { $env:PIP_NUM_CTX = "4096" }
+if (-not $env:PIP_NUM_PREDICT) { $env:PIP_NUM_PREDICT = "256" }
 
 Write-Host "Prüfe Ollama lokal..."
 try {
@@ -27,13 +25,6 @@ try {
     throw "Ollama ist unter http://127.0.0.1:11434 nicht erreichbar. Starte Ollama zuerst."
 }
 
-try {
-    $null = Invoke-WebRequest -Uri "http://127.0.0.1:8188/system_stats" -TimeoutSec 5
-} catch {
-    throw "ComfyUI ist unter http://127.0.0.1:8188 nicht erreichbar. Starte zuerst ComfyUI und prüfe den Browser."
-}
-
-Write-Host "Starte Pip-Server. ComfyUI muss lokal unter 127.0.0.1:8188 erreichbar sein."
-Write-Host "Bild-Checkpoint: $env:PIP_COMFYUI_CHECKPOINT"
-Write-Host "Wichtig: Port 8765/11434/8188 niemals öffentlich freigeben."
+Write-Host "Starte Pip-Server ohne Bildgenerierung."
+Write-Host "Ollama-Einstellungen: CPU=$env:PIP_NUM_GPU, Kontext=$env:PIP_NUM_CTX, Antwortlimit=$env:PIP_NUM_PREDICT"
 python $server
