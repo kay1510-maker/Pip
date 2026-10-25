@@ -222,3 +222,136 @@ memory_code = """        appendHistory("Kay", q)
 s = s.replace(memory_anchor, memory_code, 1)
 main_path.write_text(s, encoding="utf-8")
 print("Expliziter Merker-Befehl integriert.")
+
+# Finish the same integrated settings flow: configurable display name, reliable model-load
+# errors, and no stale history shown after a full local reset.
+s = main_path.read_text(encoding="utf-8")
+s = replace_once(
+    s,
+    "    private lateinit var historyScroll: ScrollView\n",
+    "    private lateinit var historyScroll: ScrollView\n    private lateinit var titleView: TextView\n",
+    "add editable Pip display name"
+)
+s = replace_once(
+    s,
+    """        root.addView(TextView(this).apply { text = "❤️ Pip"; textSize = 30f; setPadding(0, 0, 0, 8) })""",
+    """        titleView = TextView(this).apply {
+            text = "❤️ " + (getSharedPreferences("pip_settings", MODE_PRIVATE).getString("pip_name", "Pip") ?: "Pip")
+            textSize = 30f
+            setPadding(0, 0, 0, 8)
+        }
+        root.addView(titleView)""",
+    "use configurable title"
+)
+s = replace_once(
+    s,
+    """        val speechSwitch = Switch(this).apply {
+            text = "Antworten laut vorlesen"
+            isChecked = prefs.getBoolean("speech_enabled", true)
+        }""",
+    """        val nameInput = EditText(this).apply {
+            hint = "Name der Begleiterin"
+            setText(prefs.getString("pip_name", "Pip") ?: "Pip")
+        }
+        panel.addView(TextView(this).apply { text = "Name der Begleiterin" })
+        panel.addView(nameInput)
+        val speechSwitch = Switch(this).apply {
+            text = "Antworten laut vorlesen"
+            isChecked = prefs.getBoolean("speech_enabled", true)
+        }""",
+    "add name field to settings"
+)
+s = replace_once(
+    s,
+    """                val editor = prefs.edit().putBoolean("speech_enabled", speechSwitch.isChecked)""",
+    """                val editor = prefs.edit()
+                    .putString("pip_name", nameInput.text.toString().trim().ifBlank { "Pip" }.take(30))
+                    .putBoolean("speech_enabled", speechSwitch.isChecked)""",
+    "save custom name"
+)
+s = replace_once(
+    s,
+    """                editor.apply()
+                status.text = "Pips Gesprächsstil gespeichert." """.rstrip(),
+    """                editor.apply()
+                titleView.text = "❤️ " + (prefs.getString("pip_name", "Pip") ?: "Pip")
+                status.text = "Pips Gesprächsstil gespeichert." """.rstrip(),
+    "refresh custom title"
+)
+s = replace_once(
+    s,
+    """            val jealousy = prefs.getInt("jealousy", 20)
+            val prompt = """,
+    """            val jealousy = prefs.getInt("jealousy", 20)
+            val pipName = prefs.getString("pip_name", "Pip") ?: "Pip"
+            val prompt = """,
+    "read configurable persona name"
+)
+s = replace_once(s, "Du bist Pip, eine erwachsene, deutschsprachige KI-Freundin", "Du bist $pipName, eine erwachsene, deutschsprachige KI-Freundin", "use configured persona name")
+s = replace_once(s, "\nPip:\"\"\"", "\n$pipName:\"\"\"", "use configured persona name in prompt ending")
+
+s = replace_once(
+    s,
+    """            lifecycleScope.launch(Dispatchers.IO) {
+                modelInitMutex.withLock { if (model == null) prepareModel() }
+                if (model == null) {""",
+    """            lifecycleScope.launch(Dispatchers.IO) {
+                try {
+                    modelInitMutex.withLock { if (model == null) prepareModel() }
+                } catch (e: Throwable) {
+                    val message = "Pip konnte die lokale KI nicht laden: " + (e.message ?: e.javaClass.simpleName)
+                    withContext(Dispatchers.Main) {
+                        status.text = "Modell konnte nicht geladen werden."
+                        output.text = message
+                        appendHistory("Pip", message)
+                    }
+                    return@launch
+                }
+                if (model == null) {""",
+    "catch model download and initialization failures"
+)
+s = replace_once(
+    s,
+    """    private fun showPreviousCrashReason() {
+        try {""",
+    """    private fun showPreviousCrashReason() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
+        try {""",
+    "guard crash diagnostics on older Android"
+)
+s = replace_once(
+    s,
+    """                            db.clearMemories()
+                            status.text = "Gedächtnis zurückgesetzt." """.rstrip(),
+    """                            db.clearMemories()
+                            if (::historyView.isInitialized) historyView.text = ""
+                            status.text = "Gedächtnis zurückgesetzt." """.rstrip(),
+    "clear visible transcript on full reset"
+)
+s = replace_once(
+    s,
+    """                        db.clearMemories()
+                        status.text = "Gedächtnis geleert." """.rstrip(),
+    """                        db.clearMemories()
+                        if (::historyView.isInitialized) historyView.text = ""
+                        status.text = "Gedächtnis geleert." """.rstrip(),
+    "clear visible transcript on memory reset"
+)
+s = replace_once(
+    s,
+    "Pip hat noch keine gespeicherten Gesprächserinnerungen.",
+    "Noch keine eigenen Erinnerungen. Schreibe im Chat „Merk dir …“, damit Pip einen Fakt speichert.",
+    "explain explicit memory command"
+)
+main_path.write_text(s, encoding="utf-8")
+
+d = db_path.read_text(encoding="utf-8")
+old_relation = """        Cursor r=getReadableDatabase().rawQuery("SELECT closeness,stage FROM relationship WHERE id=1",null);
+        if(r.moveToFirst()) s.append("Beziehungsstufe: ").append(r.getString(1)).append(" (").append(r.getInt(0)).append("/100)\\n");
+        r.close();
+"""
+if old_relation in d:
+    d = d.replace(old_relation, "", 1)
+db_path.write_text(d, encoding="utf-8")
+print("Pip-Integration ergänzt: Name einstellbar, Modellfehler abgefangen, Reset-Anzeige konsistent.")
+
