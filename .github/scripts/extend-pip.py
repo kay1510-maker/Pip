@@ -45,7 +45,7 @@ s = replace_once(s, "    private fun showPipSettings() {",
     private fun showPipSettings() {""",
     "add transcript helper")
 if 'appendHistory("Kay", q)' not in s:
-    replace_once(s,
+    s = replace_once(s,
         """        val q = text.trim()
         if (q.isEmpty()) return
         if (model == null) {""",
