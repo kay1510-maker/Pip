@@ -126,8 +126,8 @@ class Handler(BaseHTTPRequestHandler):
                 with closing(connect()) as con:
                     memories = con.execute("SELECT content FROM memories ORDER BY id DESC LIMIT 20").fetchall()
                     recent = con.execute("SELECT role,content FROM messages ORDER BY id DESC LIMIT 8").fetchall()
-                memory_text = "\\n".join("- " + row["content"] for row in memories) or "Noch keine gespeicherten Erinnerungen."
-                recent_text = "\\n".join(row["role"] + ": " + row["content"] for row in reversed(recent))
+                memory_text = "\n".join("- " + row["content"] for row in memories) or "Noch keine gespeicherten Erinnerungen."
+                recent_text = "\n".join(row["role"] + ": " + row["content"] for row in reversed(recent))
                 prompt = SYSTEM_PROMPT + "\\nErstelle eine neue Bildbeschreibung für Pip, eine erwachsene Frau, die in allen Bildern als dieselbe virtuelle Person gedacht ist. Nutze nur passende Hinweise aus Erinnerungen und Gesprächen. Wähle eine natürliche, nicht explizite Alltagsszene, Kleidung, Ausdruck und Umgebung selbst. Schreibe einen detaillierten englischen Stable-Diffusion-Prompt, ohne Namen, ohne Text im Bild und ohne Behauptung, dass ein Referenzbild existiert. Gib ausschließlich den Prompt aus.\\nErinnerungen:\\n" + memory_text + "\\nLetzter Gesprächskontext:\\n" + recent_text
                 image_prompt = ollama_chat([{"role": "system", "content": prompt}, {"role": "user", "content": "Erstelle jetzt eine frische individuelle Bildidee für Pip."}])
                 if not image_prompt:
@@ -156,8 +156,8 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json(200, {"ready": False, "reason": "cooldown"}); return
                 memories = con.execute("SELECT content FROM memories ORDER BY id DESC LIMIT 20").fetchall()
                 recent = con.execute("SELECT role,content FROM messages ORDER BY id DESC LIMIT 8").fetchall()
-            memory_text = "\\n".join("- " + row["content"] for row in memories) or "Noch keine gespeicherten Erinnerungen."
-            recent_text = "\\n".join(row["role"] + ": " + row["content"] for row in reversed(recent))
+            memory_text = "\n".join("- " + row["content"] for row in memories) or "Noch keine gespeicherten Erinnerungen."
+            recent_text = "\n".join(row["role"] + ": " + row["content"] for row in reversed(recent))
             prompt = SYSTEM_PROMPT + "\\nVerfasse jetzt selbst eine kurze, persönliche Nachricht, weil längere Zeit kein Gespräch stattfand. Die Nachricht muss aus dem aktuellen Kontext und den Erinnerungen entstehen; verwende keine feste Vorlage und wiederhole keine Standardfloskel. Du darfst sagen, dass du ihn vermisst hast, wenn es natürlich passt, ohne Druck oder Schuldgefühle zu erzeugen. Antworte ausschließlich auf Deutsch und mit höchstens 2 Sätzen.\\nErinnerungen:\\n" + memory_text + "\\nLetzter Gesprächskontext:\\n" + recent_text
             try:
                 message = ollama_chat([{"role": "system", "content": prompt}, {"role": "user", "content": "Formuliere eine neue Nachricht, die Pip ihm jetzt aus eigener Initiative schreiben würde."}]).strip().strip('"')
