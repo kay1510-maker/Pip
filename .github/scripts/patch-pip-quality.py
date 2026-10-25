@@ -256,9 +256,6 @@ pc_new = r"""            val answer = json.optString("reply", "").trim()
             }"""
 main = replace_once(main, pc_old, pc_new, "use Android TTS for PC replies")
 
-if "import kotlinx.coroutines.cancel" not in main:
-    main = replace_once(main, "import kotlinx.coroutines.Dispatchers\n", "import kotlinx.coroutines.Dispatchers\nimport kotlinx.coroutines.cancel\n", "import lifecycle cancellation")
-
 # Explicit "remember this" requests are saved locally first, then mirrored to the PC only when that backend is enabled.
 memory_start = main.index("        val memoryMatch = Regex(")
 route_marker = '        if (getSharedPreferences("pip_settings", MODE_PRIVATE).getBoolean("pc_backend_enabled", false)) {'
@@ -310,24 +307,21 @@ main = main.replace(
     "Ich erreiche das PC-Gehirn gerade nicht. Prüfe Server, Token und private Netzwerkadresse. Lokale Erinnerungen bleiben auf dem Handy gespeichert."
 )
 
-# Cancel in-flight work and release recognizer, TTS and SQLite resources when the activity is destroyed.
-if "override fun onDestroy()" not in main:
-    main = replace_once(
-        main,
-        "    private fun buildUi() {",
-        """    override fun onDestroy() {
-        try { lifecycleScope.cancel() } catch (_: Throwable) { }
-        try { recognizer?.cancel(); recognizer?.destroy() } catch (_: Throwable) { }
-        recognizer = null
-        try { tts.stop(); tts.shutdown() } catch (_: Throwable) { }
-        try { db.close() } catch (_: Throwable) { }
-        super.onDestroy()
-    }
-
-    private fun buildUi() {""",
-        "release activity resources",
-    )
-
+# Extend the existing onDestroy implementation rather than creating a duplicate.
+on_destroy_pattern = r"    override fun onDestroy\(\) \{.*?\n    \}"
+def ensure_on_destroy_cleanup(match):
+    block = match.group(0)
+    if "db.close()" not in block:
+        block = block.replace("        super.onDestroy()", "        try { db.close() } catch (_: Throwable) { }\n        super.onDestroy()")
+    if "tts.stop()" not in block:
+        block = block.replace(
+            "        if (::tts.isInitialized) tts.shutdown()",
+            "        if (::tts.isInitialized) { try { tts.stop(); tts.shutdown() } catch (_: Throwable) { } }",
+        )
+    return block
+main, n = re.subn(on_destroy_pattern, ensure_on_destroy_cleanup, main, count=1, flags=re.S)
+if n != 1:
+    raise SystemExit("Could not safely extend existing onDestroy cleanup")
 
 main_path.write_text(main, encoding="utf-8")
 
