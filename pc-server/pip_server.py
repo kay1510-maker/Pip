@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Pip PC brain: local Ollama proxy and SQLite memory; Python standard library only."""
 from __future__ import annotations
-import json, os, re, secrets, sqlite3, time, urllib.error, urllib.request
+import json, os, re, secrets, sqlite3, time, urllib.error, urllib.parse, urllib.request
 from contextlib import closing
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -82,7 +82,7 @@ def generate_local_image(prompt_text, negative_text):
                 image_type = image_item.get("type", "output")
                 query = urllib.parse.urlencode({"filename": filename, "subfolder": subfolder, "type": image_type})
                 image_bytes = comfy_request("/view?" + query, timeout=60)
-                if image_bytes[:8] != b"\\x89PNG\\r\\n\\x1a\\n":
+                if image_bytes[:8] != b"\x89PNG\r\n\x1a\n":
                     raise RuntimeError("ComfyUI lieferte keine gültige PNG-Datei.")
                 return image_bytes
         status = entry.get("status", {})
