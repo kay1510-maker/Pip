@@ -16,6 +16,7 @@ s = replace_once(s, "Gesprächsverlauf: ${context.takeLast(160)}", "Gesprächsst
 s = replace_once(s, "Kay: ${q.take(120)}", "Kay: ${q.take(400)}", "allow natural user message length")
 s = replace_once(s, "maxTokens = 32", "maxTokens = 96", "allow fuller replies")
 s = replace_once(s, "            db.develop(1)\n", "            // Beziehung wächst nicht automatisch mit jedem Nachrichten-Zähler.\n", "remove artificial relationship counter")
+s = replace_once(s, '            db.remember("Gespräch", "Nutzer: $q | Pip: $displayAnswer", 1)\n', '            db.remember("Gespräch", "Nutzer: $q | Pip: $displayAnswer", 1)\n            db.pruneConversationLog(500)\n', "bound conversation history size")
 s = replace_once(s, "            val context = PipContextBuilder.build(db)\n            val prompt = ", """            val context = PipContextBuilder.build(db)
             val prefs = getSharedPreferences("pip_settings", MODE_PRIVATE)
             val initiative = prefs.getInt("initiative", 70)
