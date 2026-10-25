@@ -226,6 +226,36 @@ main, n = re.subn(notification_pattern, notification_replacement, main, count=1,
 if n != 1:
     raise SystemExit("Could not safely replace notification settings/scheduler")
 main = main.replace("Tägliche Pip-Erinnerung aktiviert.", "Pip-Erinnerung aktiviert.")
+
+# PC replies follow the same safe Android-TTS path as local replies; Supertonic stays disabled.
+pc_old = r"""            val answer = json.optString("reply", "").trim()
+            if (answer.isBlank()) throw IllegalStateException("Der PC hat eine leere Antwort geliefert.")
+            db.remember("Gespräch", "Nutzer: $q | Pip: $answer", 1)
+            db.pruneConversationLog(500)
+            withContext(Dispatchers.Main) {
+                output.text = answer
+                appendHistory("Pip", answer)
+                status.text = "PC verbunden · " + json.optString("model", "Ollama")
+            }
+            if (prefs.getBoolean("speech_enabled", true)) speakWithSupertonic(answer)"""
+pc_new = r"""            val answer = json.optString("reply", "").trim()
+            if (answer.isBlank()) throw IllegalStateException("Der PC hat eine leere Antwort geliefert.")
+            val displayAnswer = answer.replace(Regex("<\\/?[a-zA-Z]+>"), "")
+                .replace(Regex("\\s{2,}"), " ").trim()
+            db.remember("Gespräch", "Nutzer: $q | Pip: $displayAnswer", 1)
+            db.pruneConversationLog(500)
+            withContext(Dispatchers.Main) {
+                output.text = displayAnswer
+                appendHistory("Pip", displayAnswer)
+                status.text = "PC verbunden · " + json.optString("model", "Ollama")
+                if (prefs.getBoolean("speech_enabled", true)) {
+                    try { tts.speak(displayAnswer, TextToSpeech.QUEUE_FLUSH, null, "pip") } catch (_: Throwable) {
+                        status.text = "Sprachausgabe nicht verfügbar; Textchat funktioniert weiter."
+                    }
+                }
+            }"""
+main = replace_once(main, pc_old, pc_new, "use Android TTS for PC replies")
+
 main_path.write_text(main, encoding="utf-8")
 
 # Quiet hours are evaluated in the device's local time; if the periodic job lands in the quiet window, skip it.

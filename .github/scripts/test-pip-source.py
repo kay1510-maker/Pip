@@ -40,6 +40,21 @@ checks.update({
     "voice interaction stub is not shipped": "PipVoiceInteractionService" not in manifest and not (JAVA / "PipVoiceInteractionService.java").exists(),
 })
 
+
+ask_start = main.index("private fun ask(text: String)")
+ask_end = main.index("private suspend fun askLoaded(q: String)", ask_start)
+ask_source = main[ask_start:ask_end]
+checks.update({
+    "PC brain is opt-in after explicit memory commands": (
+        'getBoolean("pc_backend_enabled", false)' in ask_source
+        and "val memoryMatch" in ask_source
+        and ask_source.index("val memoryMatch") < ask_source.index('getBoolean("pc_backend_enabled", false)')
+    ),
+    "PC replies use Android TTS rather than disabled Supertonic": (
+        'tts.speak(displayAnswer' in main and "speakWithSupertonic(answer)" not in main
+    ),
+})
+
 failed = [name for name, passed in checks.items() if not passed]
 for name, passed in checks.items():
     print(f'{"PASS" if passed else "FAIL"}: {name}')
