@@ -334,6 +334,20 @@ memory_block = r"""        val memoryMatch = Regex("(?i)^(?:pip[, ]*)?(?:merk di
 """
 main = main[:memory_start] + memory_block + main[memory_end:]
 
+# PC-only mode: no local Qwen inference, including on connection failure.
+# Route all normal messages to the PC and preserve the settings screen for configuring it.
+route_start = main.index('        if (getSharedPreferences("pip_settings", MODE_PRIVATE).getBoolean("pc_backend_enabled", false)) {', main.index('        val memoryMatch = Regex(') + 1)
+# The first match is inside the explicit-memory handler; locate the next normal-chat branch.
+route_start = main.index('        if (getSharedPreferences("pip_settings", MODE_PRIVATE).getBoolean("pc_backend_enabled", false)) {', route_start + 1)
+route_end = main.index('\n        if (model == null)', route_start)
+main = main[:route_start] + '''        output.text = "Verbinde mit Pips PC-Gehirn …"
+        status.text = "PC-Modus · Qwen3 4B"
+        lifecycleScope.launch(Dispatchers.IO) { askWithPc(q) }
+        return
+''' + main[route_end:]
+# Prevent the app from automatically downloading/loading the unused mobile model.
+main = main.replace('        lifecycleScope.launch(Dispatchers.IO) { prepareModel() }', '        // PC-only: no mobile model preload.')
+
 # Never send the PC bearer token to a public host or an unsupported URL scheme.
 pc_connection_marker = '            conn = (URL("$base/chat").openConnection() as HttpURLConnection).apply {'
 main = replace_once(
