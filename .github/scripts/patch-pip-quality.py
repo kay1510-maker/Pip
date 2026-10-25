@@ -358,7 +358,9 @@ main = replace_once(
                 throw IllegalArgumentException("Die PC-Adresse muss mit http:// oder https:// beginnen.")
             }
             val address = java.net.InetAddress.getByName(endpoint.host)
-            if (!address.isLoopbackAddress && !address.isSiteLocalAddress && !address.isLinkLocalAddress) {
+            val hostText = endpoint.host.lowercase(Locale.ROOT)
+            val isTailscaleIPv4 = hostText.matches(Regex("^100\\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\\.[0-9]{1,3}\\.[0-9]{1,3}$"))
+            if (!address.isLoopbackAddress && !address.isSiteLocalAddress && !address.isLinkLocalAddress && !isTailscaleIPv4) {
                 throw IllegalArgumentException("Nur private oder lokale PC-Adressen sind erlaubt.")
             }
 """ + pc_connection_marker,
