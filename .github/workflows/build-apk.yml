@@ -296,7 +296,7 @@ jobs:
       - name: Pip-Funktionstests auf Android-Emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 30
+          api-level: 35
           emulator-boot-timeout: 600
           target: default
           arch: x86_64
