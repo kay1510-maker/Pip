@@ -324,6 +324,9 @@ jobs:
           test -s pip-src/app/libs/sherpa-onnx-1.13.7.aar
           ls -lh pip-src/app/libs/sherpa-onnx-1.13.7.aar
 
+      - name: Pip-Integration anwenden
+        run: python3 .github/scripts/integrate-pip.py
+
       - name: Integrierten Quellstand vor dem Build sichern
         uses: actions/upload-artifact@v4
         with:
