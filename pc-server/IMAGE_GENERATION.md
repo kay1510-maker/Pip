@@ -42,3 +42,16 @@ Wenn PyTorch CUDA oder die Treiberprüfung fehlschlägt, brich ab und melde die 
 ## Noch nicht implementiert
 
 Die beiden PowerShell-Skripte bereiten die lokale ComfyUI-Installation vor, aber sie erzeugen noch keine Pip-Bilder. Noch fehlen der authentifizierte Pip-Server-Endpunkt, der ComfyUI-Workflow mit dem gewählten Checkpoint, Bilddatei-Download sowie Android-Benachrichtigung. Diese Schritte müssen separat entwickelt und getestet werden.
+
+## Pip-Server konfigurieren
+
+Der neue authentifizierte Endpunkt ist `GET /image`. Er erstellt bei jedem Aufruf einen frischen Prompt und startet eine lokale ComfyUI-Generierung. Er gibt die PNG-Datei vorerst als Base64-Feld `image_base64` in JSON zurück. Die Android-Benachrichtigung ist noch nicht angebunden.
+
+Vor dem Serverstart müssen folgende Umgebungsvariablen gesetzt sein (Beispiel für PowerShell im selben Terminal):
+```powershell
+$env:PIP_COMFYUI_URL = "http://127.0.0.1:8188"
+$env:PIP_COMFYUI_CHECKPOINT = "DEIN_EXAKTER_MODELLDATEINAME.safetensors"
+$env:PIP_IMAGE_WIDTH = "512"
+$env:PIP_IMAGE_HEIGHT = "512"
+```
+Der Checkpoint-Dateiname muss exakt mit der Datei unter `models\checkpoints` übereinstimmen. Diese Variablen müssen im Terminal gesetzt sein, aus dem `pip_server.py` gestartet wird. Der Bild-Endpunkt benötigt einen gültigen Bearer-Token wie die anderen geschützten Endpunkte.
