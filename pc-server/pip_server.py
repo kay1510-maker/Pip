@@ -16,6 +16,10 @@ TOKEN = os.environ.get("PIP_TOKEN", "").strip()
 MAX_BODY, MAX_HISTORY = 64 * 1024, 16
 PROACTIVE_AFTER_HOURS = int(os.environ.get("PIP_PROACTIVE_AFTER_HOURS", "24"))
 PROACTIVE_COOLDOWN_HOURS = int(os.environ.get("PIP_PROACTIVE_COOLDOWN_HOURS", "24"))
+# Conservative defaults for this PC: CPU inference, smaller context and concise replies.
+NUM_GPU = int(os.environ.get("PIP_NUM_GPU", "0"))
+NUM_CTX = int(os.environ.get("PIP_NUM_CTX", "4096"))
+NUM_PREDICT = int(os.environ.get("PIP_NUM_PREDICT", "256"))
 COMFYUI_URL = os.environ.get("PIP_COMFYUI_URL", "http://127.0.0.1:8188").rstrip("/")
 COMFYUI_CHECKPOINT = os.environ.get("PIP_COMFYUI_CHECKPOINT", "").strip()
 IMAGE_WIDTH = int(os.environ.get("PIP_IMAGE_WIDTH", "512"))
@@ -92,8 +96,9 @@ def generate_local_image(prompt_text, negative_text):
 
 def ollama_chat(messages):
     req = urllib.request.Request(OLLAMA_URL, data=encoded({
-        "model": MODEL, "messages": messages, "stream": False, "keep_alive": "10m",
-        "options": {"temperature": 0.8, "num_ctx": 8192}
+        "model": MODEL, "messages": messages, "stream": False, "keep_alive": "5m",
+        "think": False,
+        "options": {"temperature": 0.8, "num_ctx": NUM_CTX, "num_predict": NUM_PREDICT, "num_gpu": NUM_GPU}
     }), headers={"Content-Type": "application/json"}, method="POST")
     with urllib.request.urlopen(req, timeout=240) as response:
         result = json.loads(response.read().decode("utf-8"))
