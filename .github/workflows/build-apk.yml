@@ -321,6 +321,17 @@ jobs:
           test -s pip-src/app/libs/sherpa-onnx-1.13.7.aar
           ls -lh pip-src/app/libs/sherpa-onnx-1.13.7.aar
 
+      - name: Integrierten Quellstand vor dem Build sichern
+        uses: actions/upload-artifact@v4
+        with:
+          name: Pip-Source-Patched
+          path: |
+            pip-src/
+            !pip-src/**/build/**
+            !pip-src/.gradle/**
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Pip APK bauen
         run: |
           gradle -p pip-src assembleDebug --no-daemon
