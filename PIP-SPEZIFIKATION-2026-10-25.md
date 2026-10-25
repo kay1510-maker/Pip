@@ -122,6 +122,12 @@ Nach jedem Schritt wird der integrierte Projektstand gebaut und getestet, bevor 
 - Modellstartfehler werden abgefangen; Gesprächsverlauf wird begrenzt, damit die lokale Datenbank nicht unbegrenzt wächst.
 - Der letzte erfolgreiche GitHub-Actions-Lauf ist [Run 40174975129](https://github.com/kay1510-maker/Pip/actions/runs/40174975129). Build und APK-Prüfung waren erfolgreich; das Artefakt heißt `Pip-APK-Integrated`.
 
+### PC-Gehirn: erster Backend-Schritt angelegt
+- Unter `pc-server/` liegt nun ein Python-Backend für Windows, das mit dem bereits vorgesehenen lokalen Ollama-Modell `qwen3:4b` über die lokale Chat-API spricht.
+- Es bietet einen token-geschützten Chat-Endpunkt und lokale SQLite-Speicherung für Verlauf und ausdrücklich angeforderte Erinnerungen (`Merk dir …`).
+- Die Backend-Dateien sind im Branch; sie sind noch nicht mit der Android-App verbunden und wurden noch nicht auf dem Windows-PC ausgeführt. Die LAN-Verbindung wird erst nach Einrichtung des Tokens und der privaten Windows-Firewall-Regel getestet.
+- Die Bildgenerierung ist bewusst ein separater nächster Baustein: optional lokaler Bildserver (z. B. ComfyUI) am PC, Avatar-Konsistenz und nur ausdrücklich erlaubte Bildtypen. Proaktive Bildzustellung muss opt-in und abschaltbar sein.
+
 ### Noch nicht als fertig bestätigt
 - Die APK wurde automatisiert gebaut und geprüft, aber noch nicht auf einem realen Android-Gerät gestartet und durchgetestet.
 - Antwortqualität, tatsächliche Modell-Ladezeit, RAM-Verbrauch, TTS-Klang, Mikrofonberechtigungen und Benachrichtigungen müssen auf dem Zielgerät geprüft werden.
