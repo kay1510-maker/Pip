@@ -108,7 +108,7 @@ s = replace_once(s, "    private suspend fun prepareModel() {", """    private f
         }
         cursor.close()
         if (labels.isEmpty()) {
-            AlertDialog.Builder(this).setTitle("Gedächtnis").setMessage("Pip hat noch keine gespeicherten Gesprächserinnerungen.")
+            AlertDialog.Builder(this).setTitle("Gedächtnis").setMessage("Noch keine separat gespeicherten Erinnerungen. Sag mir „Merk dir …“, wenn ich etwas behalten soll.")
                 .setPositiveButton("OK", null).show()
             return
         }
