@@ -100,10 +100,12 @@ s = replace_once(s, "    private suspend fun prepareModel() {", """    private f
         val cursor = db.listMemories()
         val ids = ArrayList<Long>()
         val labels = ArrayList<String>()
+        val contents = ArrayList<String>()
         while (cursor.moveToNext()) {
             ids.add(cursor.getLong(0))
             val category = cursor.getString(1) ?: "Erinnerung"
             val content = cursor.getString(2) ?: ""
+            contents.add(content)
             labels.add("$category: $content".replace("\\n", " ").take(180))
         }
         cursor.close()
@@ -115,13 +117,31 @@ s = replace_once(s, "    private suspend fun prepareModel() {", """    private f
         AlertDialog.Builder(this)
             .setTitle("Erinnerung antippen, um sie zu löschen")
             .setItems(labels.toTypedArray()) { _, which ->
+                val edit = EditText(this).apply {
+                    setText(contents[which])
+                    minLines = 2
+                    setSelection(text.length)
+                }
                 AlertDialog.Builder(this)
-                    .setTitle("Erinnerung löschen?")
-                    .setMessage(labels[which])
-                    .setNegativeButton("Abbrechen", null)
-                    .setPositiveButton("Löschen") { _, _ ->
-                        db.deleteMemory(ids[which])
+                    .setTitle("Erinnerung bearbeiten")
+                    .setMessage("Du kannst den gespeicherten Text ändern oder ihn löschen.")
+                    .setView(edit)
+                    .setNegativeButton("Schließen", null)
+                    .setPositiveButton("Speichern") { _, _ ->
+                        val updated = edit.text.toString().trim()
+                        if (updated.isNotEmpty()) db.updateMemory(ids[which], updated)
                         showMemories()
+                    }
+                    .setNeutralButton("Löschen") { _, _ ->
+                        AlertDialog.Builder(this)
+                            .setTitle("Erinnerung löschen?")
+                            .setMessage(labels[which])
+                            .setNegativeButton("Abbrechen", null)
+                            .setPositiveButton("Löschen") { _, _ ->
+                                db.deleteMemory(ids[which])
+                                showMemories()
+                            }
+                            .show()
                     }
                     .show()
             }
@@ -190,6 +210,7 @@ s = replace_once(s, '    private fun showPersonalitySettings() {', """    privat
 
     private fun showPersonalitySettings() {""", "add opt-in daily notifications")
 ""
+s = replace_once(s, "        if (model == null) {\n            output.text = \"Pip bereitet sich vor … ❤️\"\n            lifecycleScope.launch(Dispatchers.IO) {\n                modelInitMutex.withLock { if (model == null) prepareModel() }\n                if (model == null) {\n                    withContext(Dispatchers.Main) { output.text = \"Pip konnte ihr Gehirn nicht laden. ❤️\" }\n                    return@launch\n                }\n                inferenceMutex.withLock { askLoaded(q) }\n            }\n            return\n        }", "        if (model == null) {\n            output.text = \"Pip bereitet sich vor … ❤️\"\n            lifecycleScope.launch(Dispatchers.IO) {\n                try {\n                    modelInitMutex.withLock { if (model == null) prepareModel() }\n                    if (model == null) {\n                        withContext(Dispatchers.Main) { output.text = \"Pip konnte ihr Gehirn nicht laden. ❤️\" }\n                        return@launch\n                    }\n                    inferenceMutex.withLock { askLoaded(q) }\n                } catch (e: Throwable) {\n                    withContext(Dispatchers.Main) {\n                        status.text = \"Modell konnte nicht gestartet werden.\"\n                        output.text = \"Ich konnte mein Modell gerade nicht laden. Prüfe die Verbindung und versuch es bitte nochmal. (${e.message ?: e.javaClass.simpleName})\"\n                    }\n                }\n            }\n            return\n        }", "handle model startup failures")
 main_path.write_text(s, encoding="utf-8")
 
 d = db_path.read_text(encoding="utf-8")
@@ -202,6 +223,9 @@ d = replace_once(d, "    public void develop(int amount){", """    public Cursor
     }
     public void clearMemories(){
         getWritableDatabase().delete("memories",null,null);
+    }
+    public void updateMemory(long id,String content){
+        getWritableDatabase().execSQL("UPDATE memories SET content=? WHERE id=?",new Object[]{content,id});
     }
     public void pruneConversationLog(int maxRows){
         getWritableDatabase().execSQL(
