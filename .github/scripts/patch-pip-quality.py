@@ -334,19 +334,26 @@ memory_block = r"""        val memoryMatch = Regex("(?i)^(?:pip[, ]*)?(?:merk di
 """
 main = main[:memory_start] + memory_block + main[memory_end:]
 
-# PC-only mode: no local Qwen inference, including on connection failure.
-# Route all normal messages to the PC and preserve the settings screen for configuring it.
-route_start = main.index('        if (getSharedPreferences("pip_settings", MODE_PRIVATE).getBoolean("pc_backend_enabled", false)) {', main.index('        val memoryMatch = Regex(') + 1)
-# The first match is inside the explicit-memory handler; locate the next normal-chat branch.
-route_start = main.index('        if (getSharedPreferences("pip_settings", MODE_PRIVATE).getBoolean("pc_backend_enabled", false)) {', route_start + 1)
-route_end = main.index('\n        if (model == null)', route_start)
-main = main[:route_start] + '''        output.text = "Verbinde mit Pips PC-Gehirn …"
-        status.text = "PC-Modus · Qwen3 4B"
-        lifecycleScope.launch(Dispatchers.IO) { askWithPc(q) }
-        return
-''' + main[route_end:]
-# Prevent the app from automatically downloading/loading the unused mobile model.
-main = main.replace('        lifecycleScope.launch(Dispatchers.IO) { prepareModel() }', '        // PC-only: no mobile model preload.')
+# Keep the PC-hosted model optional; local on-device inference remains the default.
+pc_flag = '        if (getSharedPreferences("pip_settings", MODE_PRIVATE).getBoolean("pc_backend_enabled", false)) {'
+ask_start = main.index("    private fun ask(text: String) {")
+ask_end = main.index("    private suspend fun askLoaded(q: String) {", ask_start)
+ask_body = main[ask_start:ask_end]
+pc_positions = []
+search_from = 0
+while True:
+    position = ask_body.find(pc_flag, search_from)
+    if position < 0:
+        break
+    pc_positions.append(position)
+    search_from = position + len(pc_flag)
+if len(pc_positions) < 2:
+    raise SystemExit("Expected explicit-memory and normal-chat PC opt-in branches; refusing to ship PC-only routing")
+normal_pc_route = pc_positions[-1]
+local_model_branch = ask_body.find("        if (model == null)", normal_pc_route)
+if local_model_branch < 0 or "askWithPc(q)" not in ask_body[normal_pc_route:local_model_branch]:
+    raise SystemExit("PC routing must be opt-in and precede the local-model branch")
+print("Optional PC brain verified; local on-device inference remains the default.")
 
 # Never send the PC bearer token to a public host or an unsupported URL scheme.
 pc_connection_marker = '            conn = (URL("$base/chat").openConnection() as HttpURLConnection).apply {'

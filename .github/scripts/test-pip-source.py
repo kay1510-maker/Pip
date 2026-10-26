@@ -44,7 +44,29 @@ checks.update({
 ask_start = main.index("private fun ask(text: String)")
 ask_end = main.index("private suspend fun askLoaded(q: String)", ask_start)
 ask_source = main[ask_start:ask_end]
+
+pc_route = 'if (getSharedPreferences("pip_settings", MODE_PRIVATE).getBoolean("pc_backend_enabled", false)) {'
+pc_route_positions = []
+search_from = 0
+while True:
+    position = ask_source.find(pc_route, search_from)
+    if position < 0:
+        break
+    pc_route_positions.append(position)
+    search_from = position + len(pc_route)
+normal_pc_route = pc_route_positions[-1] if len(pc_route_positions) >= 2 else -1
+local_model_branch = ask_source.find("if (model == null)", normal_pc_route) if normal_pc_route >= 0 else -1
+normal_pc_block = ask_source[normal_pc_route:local_model_branch] if local_model_branch > normal_pc_route else ""
+local_model_block = ask_source[local_model_branch:] if local_model_branch >= 0 else ""
 checks.update({
+    "PC backend is opt-in and local inference remains reachable": (
+        len(pc_route_positions) >= 2
+        and local_model_branch > normal_pc_route
+        and "askWithPc(q)" in normal_pc_block
+        and "return" in normal_pc_block
+        and "modelInitMutex.withLock" in local_model_block
+        and "askLoaded(q)" in local_model_block
+    ),
     "PC brain is opt-in after explicit memory commands": (
         'getBoolean("pc_backend_enabled", false)' in ask_source
         and "val memoryMatch" in ask_source

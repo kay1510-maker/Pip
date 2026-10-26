@@ -303,15 +303,16 @@ jobs:
 
       - name: APK prüfen
         run: |
+          set -euo pipefail
           APK="pip-src/app/build/outputs/apk/debug/app-debug.apk"
           test -s "$APK"
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | head -n 5
+          BADGING="$("$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK")"
+          printf '%s\n' "$BADGING" | grep -m 1 '^package:'
           "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -v 4 "$APK"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$APK"
 
-      - name: Pip-Funktionstest auf Emulator (best effort)
+      - name: Pip-Instrumentierungstests auf Android-Emulator
         uses: reactivecircus/android-emulator-runner@v2
-        continue-on-error: true
         with:
           api-level: 35
           emulator-boot-timeout: 300
@@ -321,11 +322,17 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot -memory 1536
           script: |
-            set -eu
+            set -euo pipefail
+            # Build an x86_64-capable test APK; the distributable APK above remains arm64-only.
+            gradle -p pip-src assembleDebug -PpipEmulatorTests=true --no-daemon
+            gradle -p pip-src connectedDebugAndroidTest -PpipEmulatorTests=true --no-daemon
+
             APK="pip-src/app/build/outputs/apk/debug/app-debug.apk"
-            PKG="$("$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | sed -n "s/^package: name='\\([^']*\\)'.*/\\1/p")"
-            test -n "$PKG"
+            PKG="de.pip.companion"
+            test -s "$APK"
+            grep -F "applicationId '$PKG'" pip-src/app/build.gradle
             adb install -r "$APK"
+            adb shell am force-stop "$PKG" || true
             adb shell monkey -p "$PKG" 1
             sleep 15
             if ! adb shell pidof "$PKG" >/dev/null; then
@@ -333,8 +340,22 @@ jobs:
               echo "Pip blieb nach dem Start nicht aktiv."
               exit 1
             fi
-            echo "Pip wurde installiert und blieb nach dem Start im Emulator aktiv: $PKG"
+            CRASH_LOG="$(adb logcat -d -s AndroidRuntime:E)"
+            if printf '%s\n' "$CRASH_LOG" | grep -q 'FATAL EXCEPTION'; then
+              printf '%s\n' "$CRASH_LOG"
+              echo "AndroidRuntime meldete eine fatale Ausnahme beim Pip-Start."
+              exit 1
+            fi
+            echo "Pip-Instrumentierungstests bestanden; App blieb nach dem Start im Emulator aktiv."
 
-      - name: APK-Validierungsergebnis hochladen
+      - name: Android-Testberichte sichern
         if: always()
-        run: echo "APK-Kandidat wurde bereits vor dem Emulator-Test als Artifact gesichert."
+        uses: actions/upload-artifact@v4
+        with:
+          name: Pip-Android-Testberichte
+          path: |
+            pip-src/app/build/reports/androidTests/connected/**
+            pip-src/app/build/outputs/androidTest-results/connected/**
+          if-no-files-found: ignore
+          retention-days: 7
+
