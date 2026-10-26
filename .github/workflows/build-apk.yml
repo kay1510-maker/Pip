@@ -185,7 +185,7 @@ jobs:
           print("Supertonic-Initialisierung wird für die Antwort umgangen; Android-TTS übernimmt.")
           PY
 
-      - name: Supertonic sicher aktivieren und Speicherlast begrenzen
+      - name: Supertonic-Ressourcen begrenzen (Antwortpfad bleibt Android-TTS)
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -215,7 +215,7 @@ jobs:
           s = s.replace(old_gen, new_gen, 1)
           s = s.replace("engine.generateWithConfigAndCallback(text, gen)", "engine.generateWithConfigAndCallback(speechText, gen)", 1)
           p.write_text(s, encoding="utf-8")
-          print("Supertonic wird für Antworten verwendet; CPU-Threads, Satzanzahl und Textlänge sind begrenzt.")
+          print("Supertonic-Ressourcen begrenzt; Android-TTS bleibt aktiv, bis ein Hörtest den Supertonic-Pfad freigibt.")
           PY
 
       - name: Qwen-0.5B-Modell und Speicherprüfung konfigurieren

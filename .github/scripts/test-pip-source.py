@@ -44,6 +44,23 @@ checks.update({
 ask_start = main.index("private fun ask(text: String)")
 ask_end = main.index("private suspend fun askLoaded(q: String)", ask_start)
 ask_source = main[ask_start:ask_end]
+on_create_start = main.index("override fun onCreate(")
+on_create_end = main.index("private fun showPreviousCrashReason()", on_create_start)
+on_create_source = main[on_create_start:on_create_end]
+
+pc_route = 'if (getSharedPreferences("pip_settings", MODE_PRIVATE).getBoolean("pc_backend_enabled", false)) {'
+pc_route_positions = []
+search_from = 0
+while True:
+    position = ask_source.find(pc_route, search_from)
+    if position < 0:
+        break
+    pc_route_positions.append(position)
+    search_from = position + len(pc_route)
+normal_pc_route = pc_route_positions[-1] if len(pc_route_positions) >= 2 else -1
+local_model_branch = ask_source.find("if (model == null)", normal_pc_route) if normal_pc_route >= 0 else -1
+normal_pc_block = ask_source[normal_pc_route:local_model_branch] if local_model_branch > normal_pc_route else ""
+local_model_block = ask_source[local_model_branch:] if local_model_branch >= 0 else ""
 
 pc_route = 'if (getSharedPreferences("pip_settings", MODE_PRIVATE).getBoolean("pc_backend_enabled", false)) {'
 pc_route_positions = []
@@ -59,6 +76,7 @@ local_model_branch = ask_source.find("if (model == null)", normal_pc_route) if n
 normal_pc_block = ask_source[normal_pc_route:local_model_branch] if local_model_branch > normal_pc_route else ""
 local_model_block = ask_source[local_model_branch:] if local_model_branch >= 0 else ""
 checks.update({
+    "on-device model is loaded lazily rather than during app startup": "prepareModel()" not in on_create_source,
     "PC backend is opt-in and local inference remains reachable": (
         len(pc_route_positions) >= 2
         and local_model_branch > normal_pc_route

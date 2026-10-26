@@ -355,6 +355,11 @@ if local_model_branch < 0 or "askWithPc(q)" not in ask_body[normal_pc_route:loca
     raise SystemExit("PC routing must be opt-in and precede the local-model branch")
 print("Optional PC brain verified; local on-device inference remains the default.")
 
+# Keep first launch responsive; load the on-device model only when a message is sent.
+preload = '        lifecycleScope.launch(Dispatchers.IO) { prepareModel() }'
+if preload in main:
+    main = main.replace(preload, '        // Load the on-device model lazily when the first message is sent.', 1)
+
 # Never send the PC bearer token to a public host or an unsupported URL scheme.
 pc_connection_marker = '            conn = (URL("$base/chat").openConnection() as HttpURLConnection).apply {'
 main = replace_once(
