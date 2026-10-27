@@ -141,3 +141,12 @@ Nach jedem Schritt wird der integrierte Projektstand gebaut und getestet, bevor 
 - Der Workflow sichert nun bei Instrumentierungsfehlern den tatsächlichen Gradle-Exitcode, das vollständige Gradle-Testprotokoll, Logcat und `dumpsys activity` als Artefakte. Das ist Diagnoseinstrumentierung, keine Behebung des App-/Emulatorfehlers.
 - Nächster Schritt: den durch den PR-Branch-Update ausgelösten Lauf auswerten, Ursache aus Logcat bestimmen und erst dann die kleinste begründete Code-/Emulatoränderung vornehmen. Der integrierte APK-Kandidat bleibt bis zu einem erfolgreichen vollständigen Testlauf gesperrt; echte Geräte-, Sprach- und PC-Ollama-Tests sind weiterhin offen. `main` bleibt unverändert.
 
+
+
+### CI-Nachtrag 2026-10-27 – Buildlauf 213 / Emulator-Startabbruch
+
+- Buildlauf 213 (Commit `a01a32df`) bestand weiterhin die statischen Quellvertragstests, den arm64-APK-Build und die APK-Validierung. Der PC-Server-Workflow war erfolgreich.
+- Die Android-Instrumentierung scheiterte erneut **vor dem ersten Test**: Das XML-Testprotokoll meldet `tests="0"` und `Process crashed`. Das gesicherte Logcat zeigt, dass `de.pip.companion` beim Prozessstart in einen ANR lief (`failed to complete startup`); gleichzeitig scheiterten auch mehrere Android-Systemprozesse beim Start. Es gab keine fehlgeschlagene Test-Assertion, daher ist dies zunächst als Emulator-/Startstabilitätsproblem zu behandeln, nicht als bestandener App-Funktionstest und auch nicht als nachgewiesener Fehler einer bestimmten UI-Assertion.
+- Die Diagnoseartefakte `Pip-Android-Testberichte` wurden aus Lauf 213 gesichert und geprüft. Der vorangehende Buildlauf 212 hatte bereits gezeigt, dass Build und APK-Prüfung vor der Instrumentierung erfolgreich sind.
+- Vor der nächsten Änderung wurde der aktuelle Stand auf `backup/pip-spec-2026-10-27-before-emulator-resource-fix` bei Commit `a01a32df` gesichert.
+- Nächster begründeter Versuch: die Instrumentierung auf ein API-34-Emulator-Image umstellen, den Kaltstart-Zeitpuffer auf 900 Sekunden erhöhen und dem Headless-Emulator 3072 MiB RAM sowie 4 virtuelle CPU-Kerne geben. Danach die Instrumentierungsergebnisse und Logcat erneut prüfen. Der Test bleibt verpflichtend; ein grüner APK-Build allein reicht nicht für die Abnahme. `main` bleibt unverändert.
