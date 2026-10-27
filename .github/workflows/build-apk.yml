@@ -1,11 +1,8 @@
 name: Build Pip APK
 
 on:
+  # APK builds are manual only; no automatic runs on push or pull requests.
   workflow_dispatch:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
 
 concurrency:
   group: pip-apk-${{ github.ref }}
