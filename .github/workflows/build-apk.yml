@@ -339,19 +339,7 @@ jobs:
 
             # Keep the real Gradle exit code and collect device diagnostics even if
             # Android's instrumentation process crashes before reporting a test.
-            TEST_LOG="pip-instrumentation-gradle.log"
-            set +e
-            gradle -p pip-src connectedDebugAndroidTest -PpipEmulatorTests=true --no-daemon > "$TEST_LOG" 2>&1
-            TEST_EXIT=$?
-            set -e
-            cat "$TEST_LOG"
-            if [ "$TEST_EXIT" -ne 0 ]; then
-              adb logcat -d -b all -t 6000 > pip-emulator-logcat.txt || true
-              adb shell dumpsys activity > pip-emulator-activity.txt 2>&1 || true
-              echo "Android-Instrumentierung fehlgeschlagen (Exit $TEST_EXIT); Logcat und Gradle-Bericht wurden gesichert."
-              tail -n 200 "$TEST_LOG" || true
-              exit "$TEST_EXIT"
-            fi
+            if gradle -p pip-src connectedDebugAndroidTest -PpipEmulatorTests=true --no-daemon > pip-instrumentation-gradle.log 2>&1; then cat pip-instrumentation-gradle.log; else test_exit=$?; cat pip-instrumentation-gradle.log; adb logcat -d -b all -t 6000 > pip-emulator-logcat.txt || true; adb shell dumpsys activity > pip-emulator-activity.txt 2>&1 || true; echo "Android-Instrumentierung fehlgeschlagen (Exit $test_exit); Logcat und Gradle-Bericht wurden gesichert."; tail -n 200 pip-instrumentation-gradle.log || true; exit "$test_exit"; fi
             adb logcat -d -b all -t 6000 > pip-emulator-logcat.txt || true
 
             APK="pip-src/app/build/outputs/apk/debug/app-debug.apk"
