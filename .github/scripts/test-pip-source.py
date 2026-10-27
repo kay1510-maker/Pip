@@ -33,11 +33,13 @@ checks = {
 
 
 test_root = Path("pip-src/app/src/androidTest/java/de/pip/companion")
+ui_test_source = (test_root / "PipUiInstrumentedTest.java").read_text(encoding="utf-8") if (test_root / "PipUiInstrumentedTest.java").exists() else ""
 checks.update({
     "memory instrumentation tests generated": (test_root / "PipMemoryDbInstrumentedTest.java").exists(),
     "UI instrumentation tests generated": (test_root / "PipUiInstrumentedTest.java").exists(),
     "Android instrumentation runner configured": "androidx.test.runner.AndroidJUnitRunner" in gradle,
     "voice interaction stub is not shipped": "PipVoiceInteractionService" not in manifest and not (JAVA / "PipVoiceInteractionService.java").exists(),
+    "settings UI test does not invoke the runtime permission controller": "GrantPermissionRule" not in ui_test_source,
 })
 
 
@@ -77,6 +79,11 @@ normal_pc_block = ask_source[normal_pc_route:local_model_branch] if local_model_
 local_model_block = ask_source[local_model_branch:] if local_model_branch >= 0 else ""
 checks.update({
     "on-device model is loaded lazily rather than during app startup": "prepareModel()" not in on_create_source,
+    "microphone permission is requested only after explicit tap": (
+        "requestPermissions(this, arrayOf(Manifest.permission.RECORD_AUDIO), 10)" not in on_create_source
+        and "checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)" in asr
+        and "requestPermissions(this, arrayOf(Manifest.permission.RECORD_AUDIO), 10)" in asr
+    ),
     "PC backend is opt-in and local inference remains reachable": (
         len(pc_route_positions) >= 2
         and local_model_branch > normal_pc_route

@@ -140,9 +140,29 @@ main = replace_once(
 
 
 
+# Request microphone access only after the user explicitly taps the microphone button.
+main = replace_once(
+    main,
+    """        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+            != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.RECORD_AUDIO), 10)
+        } else {
+            status.text = "Mikrofon bereit – tippe auf 🎤 Sprechen"
+        }
+""",
+    """        status.text = "Textchat bereit. Mikrofonzugriff wird erst beim Tippen auf 🎤 Sprechen angefragt."
+""",
+    "defer microphone permission request until explicit action",
+)
+
 # SpeechRecognizer creation/startup can throw on devices without a usable offline German service.
 pattern = r"    private fun startListening\(\) \{.*?\n    \}\n\n    override fun onInit\(statusCode: Int\) \{"
 replacement = r"""    private fun startListening() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            status.text = "Mikrofonzugriff erforderlich. Erlaube ihn und tippe erneut auf 🎤 Sprechen."
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.RECORD_AUDIO), 10)
+            return
+        }
         if (!SpeechRecognizer.isRecognitionAvailable(this)) {
             output.text = "Spracherkennung ist auf diesem Gerät nicht verfügbar."
             status.text = "Du kannst Pip weiterhin schreiben."
@@ -564,12 +584,10 @@ public class PipMemoryDbInstrumentedTest {
 (test_dir / "PipMemoryDbInstrumentedTest.java").write_text(db_test, encoding="utf-8")
 ui_test = r"""package de.pip.companion;
 
-import android.Manifest;
 import android.content.Context;
 import androidx.test.core.app.ActivityScenario;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
-import androidx.test.rule.GrantPermissionRule;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -584,10 +602,6 @@ import static org.junit.Assert.assertFalse;
 @RunWith(AndroidJUnit4.class)
 public class PipUiInstrumentedTest {
     private Context context;
-
-    @Rule
-    public final GrantPermissionRule microphonePermission =
-        GrantPermissionRule.grant(Manifest.permission.RECORD_AUDIO);
 
     @Before public void resetPreferences() {
         context = InstrumentationRegistry.getInstrumentation().getTargetContext();
