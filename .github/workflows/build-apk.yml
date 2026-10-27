@@ -315,12 +315,14 @@ jobs:
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
-          emulator-boot-timeout: 300
+          # Run 208 timed out before sys.boot_completed; allow a longer boot window.
+          emulator-boot-timeout: 600
           target: default
           arch: x86_64
           profile: pixel_2
           disable-animations: true
-          emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot -memory 1536
+          # Avoid the previous 1536 MiB cap during API 35 emulator startup.
+          emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot -memory 2048
           script: |
             # reactivecircus/android-emulator-runner executes this script with /bin/sh.
             # Keep the prologue POSIX-compatible; Bash-only pipefail caused the test step to abort before tests ran.
