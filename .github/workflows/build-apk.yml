@@ -313,6 +313,7 @@ jobs:
 
       - name: Pip-Instrumentierungstests auf Android-Emulator
         uses: reactivecircus/android-emulator-runner@v2
+        timeout-minutes: 20
         with:
           api-level: 35
           # Run 208 timed out before sys.boot_completed; allow a longer boot window.
@@ -327,6 +328,12 @@ jobs:
             # reactivecircus/android-emulator-runner executes this script with /bin/sh.
             # Keep the prologue POSIX-compatible; Bash-only pipefail caused the test step to abort before tests ran.
             set -eu
+            # Wake and unlock the headless emulator before Espresso; otherwise ActivityScenario can resume
+            # MainActivity without window focus and RootViewPicker fails before the first assertion.
+            adb shell input keyevent KEYCODE_WAKEUP || true
+            adb shell wm dismiss-keyguard || true
+            adb shell input keyevent 82 || true
+            sleep 2
             # Build an x86_64-capable test APK; the distributable APK above remains arm64-only.
             gradle -p pip-src assembleDebug -PpipEmulatorTests=true --no-daemon
             gradle -p pip-src connectedDebugAndroidTest -PpipEmulatorTests=true --no-daemon
