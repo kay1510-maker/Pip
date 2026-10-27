@@ -322,7 +322,9 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot -memory 1536
           script: |
-            set -euo pipefail
+            # reactivecircus/android-emulator-runner executes this script with /bin/sh.
+            # Keep the prologue POSIX-compatible; Bash-only pipefail caused the test step to abort before tests ran.
+            set -eu
             # Build an x86_64-capable test APK; the distributable APK above remains arm64-only.
             gradle -p pip-src assembleDebug -PpipEmulatorTests=true --no-daemon
             gradle -p pip-src connectedDebugAndroidTest -PpipEmulatorTests=true --no-daemon
