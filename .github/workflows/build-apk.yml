@@ -336,7 +336,23 @@ jobs:
             sleep 2
             # Build an x86_64-capable test APK; the distributable APK above remains arm64-only.
             gradle -p pip-src assembleDebug -PpipEmulatorTests=true --no-daemon
-            gradle -p pip-src connectedDebugAndroidTest -PpipEmulatorTests=true --no-daemon
+
+            # Keep the real Gradle exit code and collect device diagnostics even if
+            # Android's instrumentation process crashes before reporting a test.
+            TEST_LOG="pip-instrumentation-gradle.log"
+            set +e
+            gradle -p pip-src connectedDebugAndroidTest -PpipEmulatorTests=true --no-daemon > "$TEST_LOG" 2>&1
+            TEST_EXIT=$?
+            set -e
+            cat "$TEST_LOG"
+            if [ "$TEST_EXIT" -ne 0 ]; then
+              adb logcat -d -b all -t 6000 > pip-emulator-logcat.txt || true
+              adb shell dumpsys activity > pip-emulator-activity.txt 2>&1 || true
+              echo "Android-Instrumentierung fehlgeschlagen (Exit $TEST_EXIT); Logcat und Gradle-Bericht wurden gesichert."
+              tail -n 200 "$TEST_LOG" || true
+              exit "$TEST_EXIT"
+            fi
+            adb logcat -d -b all -t 6000 > pip-emulator-logcat.txt || true
 
             APK="pip-src/app/build/outputs/apk/debug/app-debug.apk"
             PKG="de.pip.companion"
@@ -367,6 +383,9 @@ jobs:
           path: |
             pip-src/app/build/reports/androidTests/connected/**
             pip-src/app/build/outputs/androidTest-results/connected/**
+            pip-instrumentation-gradle.log
+            pip-emulator-logcat.txt
+            pip-emulator-activity.txt
           if-no-files-found: ignore
           retention-days: 7
 
