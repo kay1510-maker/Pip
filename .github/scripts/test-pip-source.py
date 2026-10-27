@@ -40,6 +40,8 @@ checks.update({
     "Android instrumentation runner configured": "androidx.test.runner.AndroidJUnitRunner" in gradle,
     "voice interaction stub is not shipped": "PipVoiceInteractionService" not in manifest and not (JAVA / "PipVoiceInteractionService.java").exists(),
     "settings UI test does not invoke the runtime permission controller": "GrantPermissionRule" not in ui_test_source,
+    "settings UI test uses UIAutomator instead of focus-dependent Espresso roots": "UiDevice.getInstance" in ui_test_source and "Until.findObject" in ui_test_source and "androidx.test.espresso.Espresso" not in ui_test_source,
+    "UIAutomator instrumentation dependency configured": "androidx.test.uiautomator:uiautomator:2.3.0" in gradle,
 })
 
 

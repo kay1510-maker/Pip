@@ -510,7 +510,7 @@ if "androidTestImplementation 'androidx.test:runner:1.6.2'" not in gradle:
     androidTestImplementation 'androidx.test:rules:1.6.1'
     androidTestImplementation 'androidx.test:core:1.6.1'
     androidTestImplementation 'androidx.test.ext:junit:1.2.1'
-    androidTestImplementation 'androidx.test.espresso:espresso-core:3.6.1'
+    androidTestImplementation 'androidx.test.uiautomator:uiautomator:2.3.0'
 """,
         "add Android instrumentation test dependencies",
     )
@@ -588,43 +588,54 @@ import android.content.Context;
 import androidx.test.core.app.ActivityScenario;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
+import androidx.test.uiautomator.By;
+import androidx.test.uiautomator.UiDevice;
+import androidx.test.uiautomator.UiObject2;
+import androidx.test.uiautomator.Until;
 import org.junit.Before;
-import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import static androidx.test.espresso.Espresso.onView;
-import static androidx.test.espresso.action.ViewActions.click;
-import static androidx.test.espresso.assertion.ViewAssertions.matches;
-import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
-import static androidx.test.espresso.matcher.ViewMatchers.withText;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 
 @RunWith(AndroidJUnit4.class)
 public class PipUiInstrumentedTest {
     private Context context;
+    private UiDevice device;
 
-    @Before public void resetPreferences() {
+    @Before public void resetPreferences() throws Exception {
         context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
         context.getSharedPreferences("pip_settings", Context.MODE_PRIVATE).edit().clear().commit();
         context.deleteDatabase("pip_memory.db");
+        device.wakeUp();
+        device.executeShellCommand("wm dismiss-keyguard");
+        device.pressHome();
     }
 
-    @Test public void settingsControlSpeechAndExposeOptInReminderOptions() {
+    private UiObject2 requireText(String text) {
+        UiObject2 object = device.wait(Until.findObject(By.text(text)), 10000);
+        assertNotNull("Timed out waiting for UI text: " + text, object);
+        return object;
+    }
+
+    @Test public void settingsControlSpeechAndExposeOptInReminderOptions() throws Exception {
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
-            onView(withText("⚙ Einstellungen & Gedächtnis")).perform(click());
-            onView(withText("Gesprächsstil anpassen")).perform(click());
-            onView(withText("Antworten laut vorlesen")).check(matches(isDisplayed())).perform(click());
-            onView(withText("Speichern")).perform(click());
+            device.waitForIdle();
+            requireText("⚙ Einstellungen & Gedächtnis").click();
+            requireText("Gesprächsstil anpassen").click();
+            requireText("Antworten laut vorlesen").click();
+            requireText("Speichern").click();
             assertFalse(context.getSharedPreferences("pip_settings", Context.MODE_PRIVATE)
                 .getBoolean("speech_enabled", true));
 
-            onView(withText("⚙ Einstellungen & Gedächtnis")).perform(click());
-            onView(withText("Benachrichtigungen außerhalb der App")).perform(click());
-            onView(withText("Pip-Benachrichtigungen")).check(matches(isDisplayed()));
-            onView(withText("Häufigkeit")).check(matches(isDisplayed()));
-            onView(withText("Ruhezeit beginnt")).check(matches(isDisplayed()));
-            onView(withText("Ruhezeit endet")).check(matches(isDisplayed()));
-            onView(withText("Aktivieren")).check(matches(isDisplayed()));
+            requireText("⚙ Einstellungen & Gedächtnis").click();
+            requireText("Benachrichtigungen außerhalb der App").click();
+            requireText("Pip-Benachrichtigungen");
+            requireText("Häufigkeit");
+            requireText("Ruhezeit beginnt");
+            requireText("Ruhezeit endet");
+            requireText("Aktivieren");
             assertFalse(context.getSharedPreferences("pip_settings", Context.MODE_PRIVATE)
                 .getBoolean("notifications_enabled", false));
         }

@@ -150,3 +150,12 @@ Nach jedem Schritt wird der integrierte Projektstand gebaut und getestet, bevor 
 - Die Diagnoseartefakte `Pip-Android-Testberichte` wurden aus Lauf 213 gesichert und geprüft. Der vorangehende Buildlauf 212 hatte bereits gezeigt, dass Build und APK-Prüfung vor der Instrumentierung erfolgreich sind.
 - Vor der nächsten Änderung wurde der aktuelle Stand auf `backup/pip-spec-2026-10-27-before-emulator-resource-fix` bei Commit `a01a32df` gesichert.
 - Nächster begründeter Versuch: die Instrumentierung auf ein API-34-Emulator-Image umstellen, den Kaltstart-Zeitpuffer auf 900 Sekunden erhöhen und dem Headless-Emulator 3072 MiB RAM sowie 4 virtuelle CPU-Kerne geben. Danach die Instrumentierungsergebnisse und Logcat erneut prüfen. Der Test bleibt verpflichtend; ein grüner APK-Build allein reicht nicht für die Abnahme. `main` bleibt unverändert.
+
+
+### CI-Nachtrag 2026-10-27 – API-34-Instrumentierung
+
+- Buildlauf 215 (Commit `de61c7ad`) bestand die statischen Quellvertragstests, den APK-Build und die APK-Validierung. Der PC-Server-Workflow bestand erneut alle sechs Unit-Tests (API, Tokenprüfung, SQLite-Erinnerungen und Fehlerpfade).
+- Der API-34-Emulator startete diesmal und führte tatsächlich alle vier Android-Instrumentierungstests aus. Die drei Gedächtnistests bestanden. Der UI-Test scheiterte jedoch beim allerersten Espresso-Klick mit `RootViewWithoutFocusException` (`has-window-focus=false`), bevor eine fachliche UI-Assertion ausgeführt wurde. Damit ist die Gesamt-Instrumentierung weiterhin fehlgeschlagen; das ist kein Nachweis für bestandene Einstellungen-/Benachrichtigungsfunktionen.
+- Der Quellstand wurde vor dem nächsten Testumbau auf `backup/pip-spec-2026-10-27-before-uiautomator-fix` bei Commit `de61c7ad` gesichert.
+- Nächster begründeter Versuch: den Fokus-abhängigen Espresso-UI-Test durch UIAutomator zu ersetzen, der die sichtbaren Bedienelemente über die Accessibility-Hierarchie bedient, und zugleich statisch zu prüfen, dass dieser Testpfad tatsächlich erzeugt wird. Die Gedächtnistests bleiben unverändert. Nach dem nächsten Lauf sind die Testberichte zu prüfen; keine Abnahme allein aufgrund eines erfolgreichen APK-Builds.
+- Weiter offen: realer Ollama-PC-/LAN-Test, Chat mit echtem lokalem Modell auf dem Zielgerät, Hörtest der deutschen Stimme, Offline-ASR auf einem physischen Telefon sowie Neustart-/Einstellungs-/Benachrichtigungs-Gesamttest. `main` bleibt unverändert.
