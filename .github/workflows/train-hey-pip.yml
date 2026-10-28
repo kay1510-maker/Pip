@@ -1,10 +1,6 @@
 name: Train free Hey Pip wakeword
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - ".github/workflows/train-hey-pip.yml"
   workflow_dispatch:
 
 jobs:
