@@ -42,6 +42,13 @@ checks.update({
     "settings UI test does not invoke the runtime permission controller": "GrantPermissionRule" not in ui_test_source,
     "settings UI test uses UIAutomator instead of focus-dependent Espresso roots": "UiDevice.getInstance" in ui_test_source and "Until.findObject" in ui_test_source and "androidx.test.espresso.Espresso" not in ui_test_source,
     "UIAutomator instrumentation dependency configured": "androidx.test.uiautomator:uiautomator:2.3.0" in gradle,
+    "settings UI test keeps emulator awake and avoids forcing Home": (
+        "settings put system screen_off_timeout 600000" in ui_test_source
+        and ui_test_source.count("device.wakeUp();") >= 2
+        and "device.pressHome();" not in ui_test_source
+    ),
+    "settings entry is matched without emoji-sensitive exact text": 'By.textContains("Einstellungen & Gedächtnis")' in ui_test_source,
+    "missing UI controls capture accessibility hierarchy": "uiautomator dump /sdcard/pip-window.xml" in ui_test_source,
 })
 
 

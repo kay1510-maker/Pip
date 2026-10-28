@@ -596,7 +596,6 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
 
 @RunWith(AndroidJUnit4.class)
 public class PipUiInstrumentedTest {
@@ -608,21 +607,38 @@ public class PipUiInstrumentedTest {
         device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
         context.getSharedPreferences("pip_settings", Context.MODE_PRIVATE).edit().clear().commit();
         context.deleteDatabase("pip_memory.db");
+        device.executeShellCommand("settings put system screen_off_timeout 600000");
         device.wakeUp();
         device.executeShellCommand("wm dismiss-keyguard");
-        device.pressHome();
+    }
+
+    private AssertionError missingText(String text) {
+        String hierarchy = "";
+        try {
+            hierarchy = device.executeShellCommand("uiautomator dump /sdcard/pip-window.xml >/dev/null 2>&1; cat /sdcard/pip-window.xml");
+        } catch (Exception ignored) { }
+        if (hierarchy.length() > 12000) hierarchy = hierarchy.substring(0, 12000);
+        return new AssertionError("Timed out waiting for UI text: " + text + "\nWindow hierarchy: " + hierarchy);
     }
 
     private UiObject2 requireText(String text) {
         UiObject2 object = device.wait(Until.findObject(By.text(text)), 10000);
-        assertNotNull("Timed out waiting for UI text: " + text, object);
+        if (object == null) throw missingText(text);
+        return object;
+    }
+
+    private UiObject2 requireTextContains(String text) {
+        UiObject2 object = device.wait(Until.findObject(By.textContains(text)), 10000);
+        if (object == null) throw missingText(text);
         return object;
     }
 
     @Test public void settingsControlSpeechAndExposeOptInReminderOptions() throws Exception {
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            device.wakeUp();
+            device.executeShellCommand("wm dismiss-keyguard");
             device.waitForIdle();
-            requireText("⚙ Einstellungen & Gedächtnis").click();
+            requireTextContains("Einstellungen & Gedächtnis").click();
             requireText("Gesprächsstil anpassen").click();
             requireText("Antworten laut vorlesen").click();
             requireText("Speichern").click();
