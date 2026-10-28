@@ -1,0 +1,61 @@
+name: Validate Pip integration scripts (no APK build)
+
+on:
+  push:
+    branches: [pip-spec-2026-10-25]
+    paths:
+      - '.github/scripts/**'
+      - '.github/workflows/test-pip-integration.yml'
+      - 'PIP-SPEZIFIKATION-2026-10-25.md'
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/scripts/**'
+      - '.github/workflows/test-pip-integration.yml'
+      - 'PIP-SPEZIFIKATION-2026-10-25.md'
+
+permissions:
+  contents: read
+
+jobs:
+  source-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Repository laden
+        uses: actions/checkout@v4
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Integrationsskripte auf Syntax prüfen
+        run: |
+          python -m py_compile \
+            .github/scripts/integrate-pip.py \
+            .github/scripts/patch-conversation.py \
+            .github/scripts/patch-pip-quality.py \
+            .github/scripts/test-pip-source.py
+      - name: UI-Testgenerator und manuelle APK-Ausführung absichern
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          patch = Path(".github/scripts/patch-pip-quality.py").read_text(encoding="utf-8")
+          tests = Path(".github/scripts/test-pip-source.py").read_text(encoding="utf-8")
+          build = Path(".github/workflows/build-apk.yml").read_text(encoding="utf-8")
+          header = build.split("jobs:", 1)[0]
+
+          checks = {
+              "emulator screen timeout is extended": 'settings put system screen_off_timeout 600000' in patch,
+              "settings label uses emoji-insensitive matching": 'By.textContains("Einstellungen & Gedächtnis")' in patch,
+              "missing UI controls capture accessibility hierarchy": 'uiautomator dump /sdcard/pip-window.xml' in patch,
+              "static source contracts cover the UI regression guard": "missing UI controls capture accessibility hierarchy" in tests,
+              "APK build remains manual-only": "workflow_dispatch:" in header and "pull_request:" not in header and "\\n  push:" not in header,
+          }
+          for label, passed in checks.items():
+              print(f'{"PASS" if passed else "FAIL"}: {label}')
+          failed = [label for label, passed in checks.items() if not passed]
+          if failed:
+              raise SystemExit("Integration script checks failed: " + ", ".join(failed))
+          print(f"Passed {len(checks)} integration-script checks. No APK or device test was run by this workflow.")
+          PY
