@@ -1,18 +1,7 @@
 name: Validate Pip integration scripts (no APK build)
 
 on:
-  push:
-    branches: [pip-spec-2026-10-25]
-    paths:
-      - '.github/scripts/**'
-      - '.github/workflows/test-pip-integration.yml'
-      - 'PIP-SPEZIFIKATION-2026-10-25.md'
-  pull_request:
-    branches: [main]
-    paths:
-      - '.github/scripts/**'
-      - '.github/workflows/test-pip-integration.yml'
-      - 'PIP-SPEZIFIKATION-2026-10-25.md'
+  workflow_dispatch:
 
 permissions:
   contents: read
