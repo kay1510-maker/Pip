@@ -47,7 +47,10 @@ jobs:
 
           checks = {
               "emulator screen timeout is extended": 'settings put system screen_off_timeout 600000' in patch,
-              "settings label uses emoji-insensitive matching": 'By.textContains("Einstellungen & Gedächtnis")' in patch,
+              "settings label uses emoji-insensitive matching": (
+                  'requireTextContains("Einstellungen & Gedächtnis")' in patch
+                  and "By.textContains(text)" in patch
+              ),
               "missing UI controls capture accessibility hierarchy": 'uiautomator dump /sdcard/pip-window.xml' in patch,
               "static source contracts cover the UI regression guard": "missing UI controls capture accessibility hierarchy" in tests,
               "APK build remains manual-only": "workflow_dispatch:" in header and "pull_request:" not in header and "\n  push:" not in header,

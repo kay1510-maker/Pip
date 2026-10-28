@@ -47,7 +47,10 @@ checks.update({
         and ui_test_source.count("device.wakeUp();") >= 2
         and "device.pressHome();" not in ui_test_source
     ),
-    "settings entry is matched without emoji-sensitive exact text": 'By.textContains("Einstellungen & Gedächtnis")' in ui_test_source,
+    "settings entry is matched without emoji-sensitive exact text": (
+        'requireTextContains("Einstellungen & Gedächtnis")' in ui_test_source
+        and "By.textContains(text)" in ui_test_source
+    ),
     "missing UI controls capture accessibility hierarchy": "uiautomator dump /sdcard/pip-window.xml" in ui_test_source,
 })
 
