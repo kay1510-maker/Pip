@@ -32,7 +32,7 @@ Pip soll eine fertig eingerichtete Android-KI-Begleiterin sein, die auf Deutsch 
 ## 4. KI-Modell und Ausführung
 
 - Zuerst die vorhandenen Pip-Dateien, den letzten Quellstand, die Modellinitialisierung, die Speicherverwaltung und den Build-Workflow prüfen.
-- Das aktuelle Projekt nennt das Quellarchiv `Pip-v4.9-Qwen-1.5B-Supertonic.zip`; der letzte bekannte Commit in `main` ist `681cc3594d89b1e0e76b73c06a2f9aa7ff43791b` („Use smaller Qwen 0.5B model to prevent response-time crashes“, 18.10.2026). Der Workflow scheint Teile des Archivs beim Build zu patchen. Diese automatische Patch-Kette muss geprüft werden, bevor man sie weiter verändert.
+- Das aktuelle Projekt nennt das Quellarchiv `Pip-v4.9-Qwen-1.5B-Supertonic.zip`. `681cc3594d89b1e0e76b73c06a2f9aa7ff43791b` („Use smaller Qwen 0.5B model to prevent response-time crashes“, 18.10.2026) ist die Basis des Arbeitsbranches; der aktuelle `main`-HEAD am 28.10.2026 ist `34293546e87e9f56d3edc2525ea3d6eae845d5f5` („Make Pip APK builds manual only“). Der Workflow patcht Teile des Archivs beim Build. Diese Patch-Kette muss geprüft werden, bevor man sie weiter verändert.
 - Vorhandene lokale Qwen-/Ollama-Tests und der Android-Inferenzpfad werden verglichen. Es wird nicht ohne Messung zwischen Modellen gewechselt.
 - Modellwahl anhand realer Antwortqualität, RAM-/VRAM-Verbrauch, Startzeit, Antwortlatenz und Absturzfreiheit. Kein Modell wird als kompatibel bezeichnet, bevor es auf der vorgesehenen Hardware getestet wurde.
 - Falls die Android-App einen PC mit Ollama nutzt, braucht sie eine klare Verbindungskonfiguration, verständliche Verbindungsfehler und eine sichere Verbindung im lokalen Netzwerk. PC-Inferenz funktioniert nur, wenn der PC läuft und erreichbar ist.
