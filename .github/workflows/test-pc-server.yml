@@ -1,16 +1,7 @@
 name: Test Pip PC server
 
 on:
-  push:
-    branches: [ main ]
-    paths:
-      - 'pc-server/**'
-      - '.github/workflows/test-pc-server.yml'
-  pull_request:
-    branches: [ main ]
-    paths:
-      - 'pc-server/**'
-      - '.github/workflows/test-pc-server.yml'
+  workflow_dispatch:
 
 permissions:
   contents: read
