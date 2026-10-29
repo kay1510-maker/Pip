@@ -1,9 +1,9 @@
 name: Test Pip PC server
 
 on:
-  push:
+  pull_request:
     branches:
-      - pip-spec-2026-10-25
+      - main
   workflow_dispatch:
 
 permissions:
