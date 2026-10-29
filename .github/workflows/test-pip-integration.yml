@@ -1,6 +1,9 @@
 name: Validate Pip integration scripts (no APK build)
 
 on:
+  push:
+    branches:
+      - pip-spec-2026-10-25
   workflow_dispatch:
 
 permissions:
