@@ -1,6 +1,9 @@
 name: Test Pip PC server
 
 on:
+  push:
+    branches:
+      - pip-spec-2026-10-25
   workflow_dispatch:
 
 permissions:
@@ -9,6 +12,7 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
