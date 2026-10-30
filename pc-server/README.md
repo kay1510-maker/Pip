@@ -44,3 +44,12 @@ Wenn der PC ausgeschaltet oder nicht erreichbar ist, zeigt Pip einen Verbindungs
 - Chatantworten nutzen Ollamas lokale `/api/chat`-Schnittstelle. Standardmäßig werden `num_gpu=0`, begrenzter Kontext und ein Antwortlimit verwendet.
 - Die CI-Tests prüfen API, Authentifizierung, SQLite-Gedächtnis und Fehlerpfade mit einem simulierten Modellclient. Ein erfolgreicher CI-Test ersetzt keinen Test mit echtem Ollama, dem eigenen WLAN oder einem physischen Android-Gerät.
 - Die optionale Bildgenerierung über ComfyUI ist separat dokumentiert und wird nicht als Voraussetzung für den Textchat benötigt.
+
+
+## Proaktive Benachrichtigungen
+
+Wenn Benachrichtigungen in Pip ausdrücklich aktiviert sind und zugleich das PC-Gehirn eingeschaltet ist, sendet Android einen authentifizierten `POST /proactive`. Der Request überträgt die aktuellen Gesprächsstil-Regler und – wenn die lokale Datenbank lesbar ist – einen vollständigen Snapshot von bis zu 50 lokalen Erinnerungen. So verwendet eine selbst initiierte Nachricht dieselbe Persönlichkeit und denselben Gedächtnisstand wie der Chat. Ein leerer Snapshot ist ausdrücklich gültig und synchronisiert auch das Löschen aller Erinnerungen.
+
+Der Server erzeugt die Nachricht erst live über Ollama, wenn seit der letzten Nutzernachricht mindestens `PIP_PROACTIVE_AFTER_HOURS` vergangen sind (Standard: 24 Stunden) und der Cooldown `PIP_PROACTIVE_COOLDOWN_HOURS` abgelaufen ist (Standard: 24 Stunden). Bei `ready: false`, nicht erreichbarem PC oder Modellfehler sendet Android keine Benachrichtigung; es wird keine Nachricht vorgeneriert oder in eine Warteschlange gelegt. Die bestehende GET-Variante von `/proactive` bleibt für Diagnose-/Kompatibilitätszwecke erhalten.
+
+Ist das PC-Gehirn ausgeschaltet, verwendet der Worker weiterhin kurze lokale Erinnerungsformulierungen. Ruhezeiten und der standardmäßig ausgeschaltete Benachrichtigungs-Opt-in gelten in beiden Modi.
