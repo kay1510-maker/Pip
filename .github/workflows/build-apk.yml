@@ -1,10 +1,13 @@
 name: Build Pip APK
 
 on:
-  # Run the full APK and emulator suite only on the integration branch; main is unaffected.
+  # Run APK and emulator verification only for source/build-script changes on the integration branch; main is unaffected.
   push:
     branches:
       - pip-spec-2026-10-25
+    paths:
+      - 'Pip-v4.9-Qwen-1.5B-Supertonic.zip'
+      - '.github/scripts/**'
   workflow_dispatch:
 
 concurrency:
