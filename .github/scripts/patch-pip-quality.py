@@ -952,6 +952,8 @@ class PipReminderWorker(context: Context, params: WorkerParameters) : Worker(con
                 try {
                     val lastConversationAt = memoryDb.lastConversationAt()
                     if (lastConversationAt > 0L) payload.put("last_user_at", lastConversationAt / 1000L)
+                    val localRecentContext = memoryDb.conversationHistory(8)
+                    if (localRecentContext.isNotBlank()) payload.put("recent_context", localRecentContext.take(6000))
                     val cursor = memoryDb.listMemories()
                     try {
                         val memories = JSONArray()
