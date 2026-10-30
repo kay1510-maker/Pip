@@ -254,3 +254,10 @@ Nach jedem Schritt wird der integrierte Projektstand gebaut und getestet, bevor 
 - Die lokale Datenbank erhält `lastConversationAt()`, das ausschließlich den Zeitstempel der Kategorie `Gespräch` ausliest. Ohne PC-Gehirn sendet der Worker die lokale Fallback-Erinnerung nur, wenn tatsächlich ein Gespräch existiert und mindestens 24 Stunden vergangen sind. Ohne Gesprächshistorie oder bei Datenbankfehler wird keine lokale Erinnerung gesendet.
 - Ein zusätzlicher PC-Server-Test deckt den Fall „Android hatte ein Gespräch, PC-Server noch keine Chatnachricht“ ab. Ein zusätzlicher Android-Datenbank-Instrumentierungstest prüft, dass normale Erinnerungen den Gesprächszeitstempel nicht verändern und dass das Zurücksetzen ihn entfernt. Statische Quellverträge und der CI-Guard prüfen die Zeitstempelübertragung und die Reihenfolge aus Opt-in, Ruhezeit und Netzwerkaufruf.
 - Auch diese Erweiterung ist noch nicht durch GitHub-CI, APK-/Emulator-Build oder ein physisches Gerät bestätigt. Der letzte nachgewiesene Android-Lauf bleibt 41023354734; es werden keine neuen Testerfolge behauptet.
+
+
+### Ergänzung 2026-10-30 – lokaler Gesprächskontext für proaktive Texte
+
+- Der Proaktiv-Request überträgt jetzt zusätzlich bis zu acht lokale Gesprächseinträge (maximal 6.000 Zeichen) aus `PipMemoryDb.conversationHistory(8)`. Der PC-Server verbindet diesen Ausschnitt mit dem PC-seitigen Verlauf und den synchronisierten Langzeiterinnerungen, bevor er die persönliche Nachricht über Ollama erzeugt. Damit kann Pip auch dann auf die letzte lokale Android-Unterhaltung Bezug nehmen, wenn der PC-Chat seitdem nicht benutzt wurde.
+- Ein PC-Server-Test prüft, dass dieser lokale Gesprächskontext tatsächlich im Proaktiv-Prompt ankommt. Statische Android-Verträge und der leichte Workflow-Guard verlangen die Übertragung.
+- Auch diese Quelländerung ist noch nicht durch einen tatsächlichen PC-Server-CI-Lauf oder Android-Build bestätigt.
