@@ -215,12 +215,14 @@ class PipServerTests(unittest.TestCase):
             "personality": {"name": "Pipchen", "initiative": 84},
             "memories": [],
             "last_user_at": now - 25 * 3600,
+            "recent_context": "Nutzer: Ich habe Pip am PC weitergebaut. | Pip: Ich helfe dir gern.",
         }
         with patch.object(pip_server.time, "time", return_value=now):
             status, body = self.request("/proactive", method="POST", payload=payload)
         self.assertEqual(status, 200)
         self.assertTrue(body["ready"])
         self.assertEqual(body["message"], "Testantwort 1")
+        self.assertIn("Ich habe Pip am PC weitergebaut.", self.calls[0][0]["content"])
         self.assertEqual(len(self.calls), 1)
 
     def test_proactive_uses_android_personality_and_memory_snapshot_then_respects_cooldown(self):
