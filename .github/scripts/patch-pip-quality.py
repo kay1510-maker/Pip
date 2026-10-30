@@ -222,7 +222,7 @@ notification_replacement = r"""    private fun showNotificationSettings() {
             setPadding(32, 8, 32, 0)
         }
         panel.addView(TextView(this).apply {
-            text = "Freiwillig und standardmäßig aus. Wenn ein geplanter Zeitpunkt in die Ruhezeit fällt, wird die Erinnerung ausgelassen."
+            text = "Freiwillig und standardmäßig aus. Mit aktiviertem PC-Gehirn erstellt Pip die Nachricht live nach längerer Gesprächspause; sonst nutzt sie eine lokale Erinnerung. Ruhezeiten werden beachtet."
         })
         val intervalDays = intArrayOf(1, 2, 7)
         val intervalLabels = arrayOf("Täglich", "Alle 2 Tage", "Wöchentlich")
@@ -805,3 +805,173 @@ capture_settings_dialog("    private fun showPersonalitySettings() {", "    priv
 main_path.write_text(main, encoding="utf-8")
 
 print("Settings instrumentation now drives the real activity view and AlertDialogs in-process; external window focus is not required.")
+
+
+# Make optional reminders use the same PC personality and memory when the PC brain is enabled.
+worker_path.write_text(r"""package de.pip.companion
+
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.Context
+import android.content.Intent
+import android.content.SharedPreferences
+import android.os.Build
+import android.util.Log
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
+import androidx.work.Worker
+import androidx.work.WorkerParameters
+import org.json.JSONArray
+import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.InetAddress
+import java.net.URL
+import java.util.Locale
+
+class PipReminderWorker(context: Context, params: WorkerParameters) : Worker(context, params) {
+    override fun doWork(): Result {
+        val context = applicationContext
+        val prefs = context.getSharedPreferences("pip_settings", Context.MODE_PRIVATE)
+        if (!prefs.getBoolean("notifications_enabled", false)) return Result.success()
+
+        val hour = java.time.LocalTime.now().hour
+        val quietStart = prefs.getInt("quiet_start_hour", 22).coerceIn(0, 23)
+        val quietEnd = prefs.getInt("quiet_end_hour", 8).coerceIn(0, 23)
+        val inQuietHours = when {
+            quietStart == quietEnd -> false
+            quietStart < quietEnd -> hour >= quietStart && hour < quietEnd
+            else -> hour >= quietStart || hour < quietEnd
+        }
+        if (inQuietHours) return Result.success()
+
+        val message = if (prefs.getBoolean("pc_backend_enabled", false)) {
+            createPcMessage(context, prefs)
+        } else {
+            fallbackMessage()
+        } ?: return Result.success()
+
+        return try {
+            val channelId = "pip_daily_ping"
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val channel = NotificationChannel(
+                    channelId, "Pip-Erinnerungen", NotificationManager.IMPORTANCE_DEFAULT
+                )
+                context.getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+            }
+            val open = PendingIntent.getActivity(
+                context, 714, Intent(context, MainActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                }, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            val notification = NotificationCompat.Builder(context, channelId)
+                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setContentTitle(prefs.getString("pip_name", "Pip") ?: "Pip")
+                .setContentText(message)
+                .setContentIntent(open)
+                .setAutoCancel(true)
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                .build()
+            NotificationManagerCompat.from(context).notify(714, notification)
+            Result.success()
+        } catch (_: SecurityException) {
+            Result.success()
+        } catch (e: Throwable) {
+            Log.w(TAG, "Pip-Erinnerung konnte nicht angezeigt werden.", e)
+            Result.retry()
+        }
+    }
+
+    private fun createPcMessage(context: Context, prefs: SharedPreferences): String? {
+        val base = (prefs.getString("pc_backend_url", "") ?: "").trim().trimEnd('/')
+        val token = (prefs.getString("pc_backend_token", "") ?: "").trim()
+        if (base.isBlank() || token.length < 24) return null
+
+        var connection: HttpURLConnection? = null
+        return try {
+            val endpoint = URL(base)
+            if ((endpoint.protocol != "http" && endpoint.protocol != "https") || endpoint.host.isBlank()) return null
+            val host = endpoint.host.lowercase(Locale.ROOT)
+            val address = InetAddress.getByName(endpoint.host)
+            val isTailscaleIPv4 = host.matches(
+                Regex("^100[.](6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])[.][0-9]{1,3}[.][0-9]{1,3}$")
+            )
+            if (!address.isLoopbackAddress && !address.isSiteLocalAddress &&
+                !address.isLinkLocalAddress && !isTailscaleIPv4) return null
+
+            val payload = JSONObject()
+            val personality = JSONObject()
+                .put("name", prefs.getString("pip_name", "Pip") ?: "Pip")
+                .put("initiative", prefs.getInt("initiative", 70))
+                .put("humor", prefs.getInt("humor", 65))
+                .put("romance", prefs.getInt("romance", 60))
+                .put("jealousy", prefs.getInt("jealousy", 20))
+            payload.put("personality", personality)
+
+            // Send a complete snapshot when the local DB can be read. An empty list is
+            // meaningful (the user may have deleted every memory); a read error omits it.
+            try {
+                val memoryDb = PipMemoryDb(context)
+                try {
+                    val cursor = memoryDb.listMemories()
+                    try {
+                        val memories = JSONArray()
+                        while (cursor.moveToNext() && memories.length() < 50) {
+                            memories.put(
+                                JSONObject()
+                                    .put("category", cursor.getString(1) ?: "Erinnerung")
+                                    .put("content", cursor.getString(2) ?: "")
+                            )
+                        }
+                        payload.put("memories", memories)
+                    } finally {
+                        cursor.close()
+                    }
+                } finally {
+                    memoryDb.close()
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Lokales Gedächtnis konnte nicht synchronisiert werden; PC-Snapshot bleibt bestehen.", e)
+            }
+
+            connection = URL("$base/proactive").openConnection() as HttpURLConnection
+            connection!!.apply {
+                requestMethod = "POST"
+                connectTimeout = 15000
+                readTimeout = 240000
+                doOutput = true
+                setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                setRequestProperty("Accept", "application/json")
+                setRequestProperty("Authorization", "Bearer $token")
+                outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) }
+            }
+            if (connection!!.responseCode !in 200..299) {
+                Log.w(TAG, "PC-Proaktivnachricht nicht verfügbar (HTTP \${connection!!.responseCode}).")
+                return null
+            }
+            val response = connection!!.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+            val result = JSONObject(response)
+            if (!result.optBoolean("ready", false)) return null
+            result.optString("message", "").trim().take(500).takeIf { it.isNotBlank() }
+        } catch (e: Exception) {
+            Log.w(TAG, "PC-Proaktivnachricht konnte nicht abgerufen werden.", e)
+            null
+        } finally {
+            connection?.disconnect()
+        }
+    }
+
+    private fun fallbackMessage(): String {
+        val messages = arrayOf(
+            "Na, hast du kurz Lust zu quatschen? ❤️",
+            "Ich bin da, wenn du ein bisschen reden magst. 😌",
+            "Wie läuft dein Tag bisher? Erzähl mir, wenn du magst. 💗"
+        )
+        return messages[(System.currentTimeMillis() / 86_400_000L % messages.size).toInt()]
+    }
+
+    companion object {
+        private const val TAG = "PipReminderWorker"
+    }
+}
+""", encoding="utf-8")
