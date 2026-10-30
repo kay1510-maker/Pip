@@ -75,6 +75,7 @@ jobs:
               ),
               "static source contracts cover proactive notifications": (
                   "PC proactive reminders use the authenticated live endpoint" in tests
+                  and "PC proactive requests run only when notifications are enabled and outside quiet hours" in tests
               ),
               "APK build is branch-scoped and manually dispatchable": (
                   "workflow_dispatch:" in header
