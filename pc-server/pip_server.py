@@ -100,7 +100,7 @@ def replace_memory_snapshot(con, snapshot):
 
 
 
-def proactive_message(personality=None, memory_snapshot=None, local_last_user_at=None):
+def proactive_message(personality=None, memory_snapshot=None, local_last_user_at=None, local_recent_context=None):
     """Generate a live proactive message only after the idle and cooldown gates pass."""
     now = int(time.time())
     with closing(connect()) as con:
@@ -137,6 +137,10 @@ def proactive_message(personality=None, memory_snapshot=None, local_last_user_at
     recent_text = "\n".join(
         row["role"] + ": " + row["content"] for row in reversed(recent)
     )
+    if local_recent_context:
+        local_text = str(local_recent_context).strip()[:6000]
+        if local_text:
+            recent_text = (local_text + ("\n\n" + recent_text if recent_text else ""))[:8000]
     prompt = (
         build_system_prompt(personality)
         + "\n\nVerfasse jetzt selbst eine kurze, persönliche Nachricht, weil längere Zeit kein Gespräch stattfand. "
@@ -296,6 +300,7 @@ class Handler(BaseHTTPRequestHandler):
                     data.get("personality"),
                     data.get("memories") if "memories" in data else None,
                     data.get("last_user_at"),
+                    data.get("recent_context"),
                 )
                 self.send_json(status, payload)
             except (ValueError, json.JSONDecodeError) as exc:
