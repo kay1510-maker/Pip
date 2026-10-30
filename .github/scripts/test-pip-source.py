@@ -178,6 +178,11 @@ checks.update({
         'if (prefs.getBoolean("pc_backend_enabled", false))' in worker
         and "fallbackMessage()" in worker
     ),
+    "PC proactive requests run only when notifications are enabled and outside quiet hours": (
+        worker.index('if (!prefs.getBoolean("notifications_enabled", false))')
+        < worker.index("if (inQuietHours) return Result.success()")
+        < worker.index("createPcMessage(context, prefs)")
+    ),
 
     "PC endpoint restricted to private/local addresses": all(x in main for x in ("isLoopbackAddress", "isSiteLocalAddress", "isLinkLocalAddress")),
     "PC backend receives Android personality and local memory snapshot": all(x in main for x in ('.put("personality", personality)', '.put("memories", memorySnapshot)')),
