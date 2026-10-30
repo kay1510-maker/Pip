@@ -62,12 +62,14 @@ jobs:
                   and 'setRequestProperty("Authorization", "Bearer $token")' in patch
                   and 'payload.put("personality", personality)' in patch
                   and 'payload.put("memories", memories)' in patch
+                  and 'payload.put("last_user_at", lastConversationAt / 1000L)' in patch
               ),
               "PC server accepts authenticated proactive POST requests": (
                   "def do_POST(self):" in server
                   and "if not self.authorized()" in server
                   and 'if self.path == "/proactive":' in server
                   and "proactive_message(" in server
+                  and 'data.get("last_user_at")' in server
               ),
               "PC proactive prompt uses the same personality and memory snapshot": (
                   "build_system_prompt(personality)" in server
@@ -76,6 +78,8 @@ jobs:
               "static source contracts cover proactive notifications": (
                   "PC proactive reminders use the authenticated live endpoint" in tests
                   and "PC proactive requests run only when notifications are enabled and outside quiet hours" in tests
+                  and "PC proactive requests include the local last-conversation timestamp" in tests
+                  and "local-only reminder fallback waits for 24 hours of conversation inactivity" in tests
               ),
               "APK build is branch-scoped and manually dispatchable": (
                   "workflow_dispatch:" in header
