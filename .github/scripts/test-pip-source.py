@@ -173,6 +173,10 @@ checks.update({
         and "lastConversationAt()" in worker
         and 'payload.put("last_user_at", lastConversationAt / 1000L)' in worker
     ),
+    "PC proactive requests include recent local dialogue": (
+        "conversationHistory(8)" in worker
+        and 'payload.put("recent_context", localRecentContext.take(6000))' in worker
+    ),
     "local-only reminder fallback waits for 24 hours of conversation inactivity": (
         "localConversationIsIdle(context)" in worker
         and "lastConversationAt()" in db
