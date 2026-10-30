@@ -59,6 +59,13 @@ checks.update({
         not use_in_process_settings_test
         or ("getLastSettingsDialogForTest" in main and "getLastSettingsDialogForTest" in ui_test_source)
     ),
+    "settings dialog accessor avoids a Kotlin/JVM property getter collision": (
+        not use_in_process_settings_test
+        or (
+            "fun getLastSettingsDialogForTest(): AlertDialog? = lastSettingsDialogForTestRef" in main
+            and main.count("lastSettingsDialogForTestRef = it") >= 3
+        )
+    ),
     "speech setting is exercised through the settings dialog": (
         "Antworten laut vorlesen" in ui_test_source
         and "speech_enabled" in ui_test_source
