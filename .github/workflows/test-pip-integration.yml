@@ -1,16 +1,7 @@
 name: Validate Pip integration scripts (no APK build)
 
 on:
-  push:
-    branches:
-      - pip-spec-2026-10-25
-  pull_request:
-    branches:
-      - main
   workflow_dispatch:
-
-permissions:
-  contents: read
 
 jobs:
   source-contract:
