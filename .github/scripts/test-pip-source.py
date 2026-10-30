@@ -51,7 +51,7 @@ checks.update({
         'requireTextContains("Einstellungen & Gedächtnis")' in ui_test_source
         and "By.textContains(text)" in ui_test_source
     ),
-    "missing UI controls capture accessibility hierarchy": "uiautomator dump /sdcard/pip-window.xml" in ui_test_source,
+    "missing UI controls capture accessibility hierarchy without a second automation service": "device.dumpWindowHierarchy(" in ui_test_source and "uiautomator dump" not in ui_test_source,
 })
 
 

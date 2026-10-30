@@ -204,3 +204,10 @@ Nach jedem Schritt wird der integrierte Projektstand gebaut und getestet, bevor 
 - PC-Server-Workflow 41023354739: erfolgreich. Python-Syntaxprüfung und alle 8 Unit-Tests bestanden, darunter neue Tests für die Android-Persönlichkeitseinstellungen sowie die Synchronisierung und Löschung lokaler Erinnerungen.
 - APK-Workflow 41023354734: Quellintegration und statische Pip-Verträge erfolgreich; APK-Build und APK-Validierung erfolgreich. Der Android-Emulator-Instrumentierungsschritt lief zum Zeitpunkt dieses Nachtrags noch; sein Ergebnis ist ausdrücklich offen.
 - Der leichte Integrationsworkflow 41023354740 scheiterte nicht an Python-Syntax oder den Quellschutzprüfungen, sondern ausschließlich an einer veralteten Guard-Bedingung, die den APK-Workflow weiterhin als rein manuell erwartete. Die Bedingung wird an den branch-lokalen Push-Auslöser angepasst. Der APK-Workflow erhält zusätzlich einen Pfadfilter, damit reine Masterplan-/CI-Teständerungen keinen unnötigen vollständigen Emulator-Build starten.
+
+
+### Emulator-Diagnose 2026-10-30 – Fehler im UI-Test-Hilfscode gefunden
+
+- Buildlauf 41023354734: Quellintegration, statische Pip-Verträge, APK-Build und APK-Validierung waren erfolgreich. Drei von vier Emulator-Instrumentierungstests bestanden; die drei Gedächtnistests waren erfolgreich.
+- Der UI-Test scheiterte beim ersten Auffinden des Einstellungsbuttons. Der gesicherte Logcat zeigt die konkrete Ursache: Die Diagnosemethode startete aus einem bereits laufenden UIAutomator-Test heraus zusätzlich den Shell-Prozess `uiautomator dump`. Android brach dessen zweiten UiAutomation-Service mit `UiAutomationService ... already registered` ab; deshalb blieb die Window-Hierarchy leer. Das ist ein Fehler des Test-Hilfscodes, kein Nachweis, dass der Button in der App fehlt.
+- Die Diagnose verwendet jetzt `UiDevice.dumpWindowHierarchy(File)` und damit die bereits registrierte Automation-Verbindung. Statische Quell- und Workflow-Prüfungen verlangen diese Variante und verbieten den zusätzlichen Shell-Aufruf. Ein neuer APK-/Emulatorlauf ist erforderlich; bis dahin bleibt der UI-Test offen.

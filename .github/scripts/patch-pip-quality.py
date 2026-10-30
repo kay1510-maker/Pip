@@ -647,7 +647,9 @@ public class PipUiInstrumentedTest {
     private AssertionError missingText(String text) {
         String hierarchy = "";
         try {
-            hierarchy = device.executeShellCommand("uiautomator dump /sdcard/pip-window.xml >/dev/null 2>&1; cat /sdcard/pip-window.xml");
+            java.io.File dump = new java.io.File(context.getCacheDir(), "pip-window.xml");
+            device.dumpWindowHierarchy(dump);
+            hierarchy = new String(java.nio.file.Files.readAllBytes(dump.toPath()), java.nio.charset.StandardCharsets.UTF_8);
         } catch (Exception ignored) { }
         if (hierarchy.length() > 12000) hierarchy = hierarchy.substring(0, 12000);
         return new AssertionError("Timed out waiting for UI text: " + text + "\nWindow hierarchy: " + hierarchy);
