@@ -177,10 +177,13 @@ checks.update({
         "conversationHistory(8)" in worker
         and 'payload.put("recent_context", localRecentContext.take(6000))' in worker
     ),
-    "local-only reminder fallback waits for 24 hours of conversation inactivity": (
+    "local-only reminder fallback requires a real 24-hour-old conversation": (
         "localConversationIsIdle(context)" in worker
+        and "private fun localConversationIsIdle(context: Context): Boolean" in worker
         and "lastConversationAt()" in db
-        and "24L * 60L * 60L * 1000L" in worker
+        and "lastConversationAt > 0L" in worker
+        and "System.currentTimeMillis() - lastConversationAt >= 24L * 60L * 60L * 1000L" in worker
+        and "catch (e: Exception)" in worker
     ),
     "PC proactive reminders respect idle gate and local-network boundary": (
         'if (!result.optBoolean("ready", false)) return null' in worker

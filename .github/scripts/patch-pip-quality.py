@@ -1002,6 +1002,22 @@ class PipReminderWorker(context: Context, params: WorkerParameters) : Worker(con
         }
     }
 
+    private fun localConversationIsIdle(context: Context): Boolean {
+        return try {
+            val memoryDb = PipMemoryDb(context)
+            try {
+                val lastConversationAt = memoryDb.lastConversationAt()
+                lastConversationAt > 0L &&
+                    System.currentTimeMillis() - lastConversationAt >= 24L * 60L * 60L * 1000L
+            } finally {
+                memoryDb.close()
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Lokaler Gesprächszeitpunkt konnte nicht gelesen werden; Erinnerung wird ausgelassen.", e)
+            false
+        }
+    }
+
     private fun fallbackMessage(): String {
         val messages = arrayOf(
             "Na, hast du kurz Lust zu quatschen? ❤️",
