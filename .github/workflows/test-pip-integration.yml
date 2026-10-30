@@ -48,7 +48,14 @@ jobs:
               ),
               "missing UI controls capture accessibility hierarchy": 'uiautomator dump /sdcard/pip-window.xml' in patch,
               "static source contracts cover the UI regression guard": "missing UI controls capture accessibility hierarchy" in tests,
-              "APK build is branch-scoped and manually dispatchable": (\n        "workflow_dispatch:" in header\n        and "pull_request:" not in header\n        and "push:" in header\n        and "pip-spec-2026-10-25" in header\n        and "paths:" in header\n        and "Pip-v4.9-Qwen-1.5B-Supertonic.zip" in header\n    ),
+              "APK build is branch-scoped and manually dispatchable": (
+                  "workflow_dispatch:" in header
+                  and "pull_request:" not in header
+                  and "push:" in header
+                  and "pip-spec-2026-10-25" in header
+                  and "paths:" in header
+                  and "Pip-v4.9-Qwen-1.5B-Supertonic.zip" in header
+              ),
           }
           for label, passed in checks.items():
               print(f'{"PASS" if passed else "FAIL"}: {label}')
