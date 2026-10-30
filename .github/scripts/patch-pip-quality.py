@@ -542,7 +542,6 @@ if "androidTestImplementation 'androidx.test:runner:1.6.2'" not in gradle:
     androidTestImplementation 'androidx.test:rules:1.6.1'
     androidTestImplementation 'androidx.test:core:1.6.1'
     androidTestImplementation 'androidx.test.ext:junit:1.2.1'
-    androidTestImplementation 'androidx.test.uiautomator:uiautomator:2.3.0'
 """,
         "add Android instrumentation test dependencies",
     )
@@ -616,83 +615,193 @@ public class PipMemoryDbInstrumentedTest {
 (test_dir / "PipMemoryDbInstrumentedTest.java").write_text(db_test, encoding="utf-8")
 ui_test = r"""package de.pip.companion;
 
+import android.app.AlertDialog;
 import android.content.Context;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.Button;
+import android.widget.ListView;
+import android.widget.SeekBar;
+import android.widget.Switch;
+import android.widget.TextView;
 import androidx.test.core.app.ActivityScenario;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
-import androidx.test.uiautomator.By;
-import androidx.test.uiautomator.UiDevice;
-import androidx.test.uiautomator.UiObject2;
-import androidx.test.uiautomator.Until;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.*;
 
 @RunWith(AndroidJUnit4.class)
 public class PipUiInstrumentedTest {
     private Context context;
-    private UiDevice device;
 
-    @Before public void resetPreferences() throws Exception {
+    @Before public void resetPreferences() {
         context = InstrumentationRegistry.getInstrumentation().getTargetContext();
-        device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
         context.getSharedPreferences("pip_settings", Context.MODE_PRIVATE).edit().clear().commit();
         context.deleteDatabase("pip_memory.db");
-        device.executeShellCommand("settings put system screen_off_timeout 600000");
-        device.wakeUp();
-        device.executeShellCommand("wm dismiss-keyguard");
     }
 
-    private AssertionError missingText(String text) {
-        String hierarchy = "";
-        try {
-            java.io.File dump = new java.io.File(context.getCacheDir(), "pip-window.xml");
-            device.dumpWindowHierarchy(dump);
-            hierarchy = new String(java.nio.file.Files.readAllBytes(dump.toPath()), java.nio.charset.StandardCharsets.UTF_8);
-        } catch (Exception ignored) { }
-        if (hierarchy.length() > 12000) hierarchy = hierarchy.substring(0, 12000);
-        return new AssertionError("Timed out waiting for UI text: " + text + "\nWindow hierarchy: " + hierarchy);
+    private static Button findButtonContaining(View root, String text) {
+        if (root instanceof Button) {
+            CharSequence label = ((Button) root).getText();
+            if (label != null && label.toString().contains(text)) return (Button) root;
+        }
+        if (root instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) root;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                Button found = findButtonContaining(group.getChildAt(i), text);
+                if (found != null) return found;
+            }
+        }
+        return null;
     }
 
-    private UiObject2 requireText(String text) {
-        UiObject2 object = device.wait(Until.findObject(By.text(text)), 10000);
-        if (object == null) throw missingText(text);
-        return object;
+    private static Switch findSwitchContaining(View root, String text) {
+        if (root instanceof Switch) {
+            CharSequence label = ((Switch) root).getText();
+            if (label != null && label.toString().contains(text)) return (Switch) root;
+        }
+        if (root instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) root;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                Switch found = findSwitchContaining(group.getChildAt(i), text);
+                if (found != null) return found;
+            }
+        }
+        return null;
     }
 
-    private UiObject2 requireTextContains(String text) {
-        UiObject2 object = device.wait(Until.findObject(By.textContains(text)), 10000);
-        if (object == null) throw missingText(text);
-        return object;
+    private static SeekBar findFirstSeekBar(View root) {
+        if (root instanceof SeekBar) return (SeekBar) root;
+        if (root instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) root;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                SeekBar found = findFirstSeekBar(group.getChildAt(i));
+                if (found != null) return found;
+            }
+        }
+        return null;
     }
 
-    @Test public void settingsControlSpeechAndExposeOptInReminderOptions() throws Exception {
+    private static boolean containsText(View root, String text) {
+        if (root instanceof TextView) {
+            CharSequence value = ((TextView) root).getText();
+            if (value != null && value.toString().contains(text)) return true;
+        }
+        if (root instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) root;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                if (containsText(group.getChildAt(i), text)) return true;
+            }
+        }
+        return false;
+    }
+
+    private static void selectItem(AlertDialog dialog, int position) {
+        assertNotNull(dialog);
+        ListView list = dialog.getListView();
+        assertNotNull(list);
+        assertNotNull(list.getAdapter());
+        assertTrue(position >= 0 && position < list.getAdapter().getCount());
+        assertTrue(list.performItemClick(null, position, list.getAdapter().getItemId(position)));
+    }
+
+    @Test public void settingsControlSpeechAndExposeOptInReminderOptions() {
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
-            device.wakeUp();
-            device.executeShellCommand("wm dismiss-keyguard");
-            device.waitForIdle();
-            requireTextContains("Einstellungen & Gedächtnis").click();
-            requireText("Gesprächsstil anpassen").click();
-            requireText("Antworten laut vorlesen").click();
-            requireText("Speichern").click();
-            assertFalse(context.getSharedPreferences("pip_settings", Context.MODE_PRIVATE)
-                .getBoolean("speech_enabled", true));
+            scenario.onActivity(activity -> {
+                Button settingsButton = findButtonContaining(
+                    activity.getWindow().getDecorView(), "Einstellungen & Gedächtnis");
+                assertNotNull("Settings entry must be present in the actual activity view tree", settingsButton);
+                assertTrue(settingsButton.performClick());
 
-            requireText("⚙ Einstellungen & Gedächtnis").click();
-            requireText("Benachrichtigungen außerhalb der App").click();
-            requireText("Pip-Benachrichtigungen");
-            requireText("Häufigkeit");
-            requireText("Ruhezeit beginnt");
-            requireText("Ruhezeit endet");
-            requireText("Aktivieren");
-            assertFalse(context.getSharedPreferences("pip_settings", Context.MODE_PRIVATE)
-                .getBoolean("notifications_enabled", false));
+                AlertDialog menu = activity.getLastSettingsDialogForTest();
+                assertNotNull(menu);
+                assertEquals("Pip-Einstellungen", menu.getTitle().toString());
+                assertEquals("Gesprächsstil anpassen", menu.getListView().getAdapter().getItem(0).toString());
+                selectItem(menu, 0);
+
+                AlertDialog style = activity.getLastSettingsDialogForTest();
+                assertNotNull(style);
+                Switch speech = findSwitchContaining(style.getWindow().getDecorView(), "Antworten laut vorlesen");
+                assertNotNull("Speech toggle must be present in the real settings dialog", speech);
+                speech.setChecked(false);
+                SeekBar initiative = findFirstSeekBar(style.getWindow().getDecorView());
+                assertNotNull("Personality sliders must be present", initiative);
+                initiative.setProgress(82);
+                style.getButton(AlertDialog.BUTTON_POSITIVE).performClick();
+
+                assertFalse(context.getSharedPreferences("pip_settings", Context.MODE_PRIVATE)
+                    .getBoolean("speech_enabled", true));
+                assertEquals(82, context.getSharedPreferences("pip_settings", Context.MODE_PRIVATE)
+                    .getInt("initiative", 70));
+
+                assertTrue(settingsButton.performClick());
+                menu = activity.getLastSettingsDialogForTest();
+                assertNotNull(menu);
+                assertEquals("Benachrichtigungen außerhalb der App",
+                    menu.getListView().getAdapter().getItem(3).toString());
+                selectItem(menu, 3);
+
+                AlertDialog notifications = activity.getLastSettingsDialogForTest();
+                assertNotNull(notifications);
+                View dialogRoot = notifications.getWindow().getDecorView();
+                assertTrue(containsText(dialogRoot, "Häufigkeit"));
+                assertTrue(containsText(dialogRoot, "Ruhezeit beginnt"));
+                assertTrue(containsText(dialogRoot, "Ruhezeit endet"));
+                assertFalse(context.getSharedPreferences("pip_settings", Context.MODE_PRIVATE)
+                    .getBoolean("notifications_enabled", false));
+                notifications.getButton(AlertDialog.BUTTON_POSITIVE).performClick();
+                assertFalse(context.getSharedPreferences("pip_settings", Context.MODE_PRIVATE)
+                    .getBoolean("notifications_enabled", false));
+            });
         }
     }
-}
-"""
+}"""
 (test_dir / "PipUiInstrumentedTest.java").write_text(ui_test, encoding="utf-8")
 
 print("Pip-Qualitätsintegration angewendet: Gedächtnis, Sprache, Opt-in-Erinnerungen; Wakeword bleibt bis zum Gerätetest deaktiviert.")
 
+
+
+# Expose the actual settings dialogs to in-process instrumentation tests.
+main = main_path.read_text(encoding="utf-8")
+field_anchor = "    private var model: Any? = null"
+if "lastSettingsDialogForTest" not in main:
+    if main.count(field_anchor) != 1:
+        raise SystemExit("Could not safely add the settings-dialog test reference")
+    main = main.replace(
+        field_anchor,
+        field_anchor + "\n    private var lastSettingsDialogForTest: AlertDialog? = null",
+        1,
+    )
+
+getter_anchor = "    private fun showPipSettings() {"
+if "fun getLastSettingsDialogForTest()" not in main:
+    if main.count(getter_anchor) != 1:
+        raise SystemExit("Could not safely add the settings-dialog test accessor")
+    main = main.replace(
+        getter_anchor,
+        "    fun getLastSettingsDialogForTest(): AlertDialog? = lastSettingsDialogForTest\n\n" + getter_anchor,
+        1,
+    )
+
+def capture_settings_dialog(start_marker, end_marker, label):
+    global main
+    start = main.index(start_marker)
+    end = main.index(end_marker, start)
+    block = main[start:end]
+    if "lastSettingsDialogForTest = it" in block:
+        return
+    show_at = block.rfind(".show()")
+    if show_at < 0:
+        raise SystemExit(label + ": dialog show call not found")
+    block = block[:show_at] + ".show().also { lastSettingsDialogForTest = it }" + block[show_at + len(".show()"):]
+    main = main[:start] + block + main[end:]
+
+capture_settings_dialog("    private fun showPipSettings() {", "    private fun showNotificationSettings() {", "main settings dialog")
+capture_settings_dialog("    private fun showNotificationSettings() {", "    private fun scheduleDailyNotification() {", "notification settings dialog")
+capture_settings_dialog("    private fun showPersonalitySettings() {", "    private fun showMemories() {", "personality settings dialog")
+main_path.write_text(main, encoding="utf-8")
+
+print("Settings instrumentation now drives the real activity view and AlertDialogs in-process; external window focus is not required.")
