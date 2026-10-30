@@ -99,6 +99,67 @@ def replace_memory_snapshot(con, snapshot):
     )
 
 
+
+def proactive_message(personality=None, memory_snapshot=None):
+    """Generate a live proactive message only after the idle and cooldown gates pass."""
+    now = int(time.time())
+    with closing(connect()) as con:
+        if memory_snapshot is not None:
+            replace_memory_snapshot(con, memory_snapshot)
+            con.commit()
+        last_user = con.execute(
+            "SELECT MAX(created_at) FROM messages WHERE role='user'"
+        ).fetchone()[0]
+        row = con.execute("SELECT last_sent FROM proactive_state WHERE id=1").fetchone()
+        last_proactive = row["last_sent"] if row else 0
+        if last_user is None or now - int(last_user) < max(1, PROACTIVE_AFTER_HOURS) * 3600:
+            return 200, {"ready": False, "reason": "not_long_enough"}
+        if last_proactive and now - int(last_proactive) < max(1, PROACTIVE_COOLDOWN_HOURS) * 3600:
+            return 200, {"ready": False, "reason": "cooldown"}
+        memories = con.execute(
+            "SELECT category,content FROM memories ORDER BY id DESC LIMIT 20"
+        ).fetchall()
+        recent = con.execute(
+            "SELECT role,content FROM messages ORDER BY id DESC LIMIT 8"
+        ).fetchall()
+
+    memory_text = "\\n".join(
+        f"- {row['category']}: {row['content']}" for row in memories
+    ) or "Noch keine gespeicherten Erinnerungen."
+    recent_text = "\\n".join(
+        row["role"] + ": " + row["content"] for row in reversed(recent)
+    )
+    prompt = (
+        build_system_prompt(personality)
+        + "\\n\\nVerfasse jetzt selbst eine kurze, persönliche Nachricht, weil längere Zeit kein Gespräch stattfand. "
+        + "Die Nachricht muss aus dem aktuellen Kontext und den Erinnerungen entstehen; verwende keine feste Vorlage "
+        + "und wiederhole keine Standardfloskel. Du darfst sagen, dass du ihn vermisst hast, wenn es natürlich passt, "
+        + "ohne Druck oder Schuldgefühle zu erzeugen. Antworte ausschließlich auf Deutsch und mit höchstens 2 Sätzen."
+        + "\\nErinnerungen:\\n" + memory_text
+        + "\\nLetzter Gesprächskontext:\\n" + recent_text
+    )
+    try:
+        message = ollama_chat([
+            {"role": "system", "content": prompt},
+            {"role": "user", "content": "Formuliere eine neue Nachricht, die Pip ihm jetzt aus eigener Initiative schreiben würde."},
+        ]).strip().strip('"')[:500]
+        if not message:
+            raise RuntimeError("Ollama hat keine persönliche Nachricht erzeugt.")
+        with closing(connect()) as con:
+            con.execute(
+                "INSERT INTO proactive_state(id,last_sent) VALUES (1,?) "
+                "ON CONFLICT(id) DO UPDATE SET last_sent=excluded.last_sent",
+                (now,),
+            )
+            con.commit()
+        return 200, {"ready": True, "message": message, "created_at": now, "generated_live": True}
+    except Exception as exc:
+        return 503, {
+            "ready": False,
+            "error": "Proaktive Nachricht konnte nicht erzeugt werden.",
+            "detail": str(exc)[:500],
+        }
+
 def comfy_request(path, payload=None, timeout=30):
     data = None if payload is None else encoded(payload)
     headers = {} if data is None else {"Content-Type": "application/json"}
@@ -200,32 +261,8 @@ class Handler(BaseHTTPRequestHandler):
                 rows = con.execute("SELECT id,category,content,created_at FROM memories ORDER BY id DESC LIMIT 200").fetchall()
             self.send_json(200, {"memories": [dict(r) for r in rows]}); return
         if self.path == "/proactive":
-            # Generate the message live on this request; persist only the cooldown timestamp,
-            # never a prewritten or pending message queue.
-            now = int(time.time())
-            with closing(connect()) as con:
-                last_user = con.execute("SELECT MAX(created_at) FROM messages WHERE role='user'").fetchone()[0]
-                row = con.execute("SELECT last_sent FROM proactive_state WHERE id=1").fetchone()
-                last_proactive = row["last_sent"] if row else 0
-                if last_user is None or now - int(last_user) < max(1, PROACTIVE_AFTER_HOURS) * 3600:
-                    self.send_json(200, {"ready": False, "reason": "not_long_enough"}); return
-                if last_proactive and now - int(last_proactive) < max(1, PROACTIVE_COOLDOWN_HOURS) * 3600:
-                    self.send_json(200, {"ready": False, "reason": "cooldown"}); return
-                memories = con.execute("SELECT content FROM memories ORDER BY id DESC LIMIT 20").fetchall()
-                recent = con.execute("SELECT role,content FROM messages ORDER BY id DESC LIMIT 8").fetchall()
-            memory_text = "\n".join("- " + row["content"] for row in memories) or "Noch keine gespeicherten Erinnerungen."
-            recent_text = "\n".join(row["role"] + ": " + row["content"] for row in reversed(recent))
-            prompt = SYSTEM_PROMPT + "\\nVerfasse jetzt selbst eine kurze, persönliche Nachricht, weil längere Zeit kein Gespräch stattfand. Die Nachricht muss aus dem aktuellen Kontext und den Erinnerungen entstehen; verwende keine feste Vorlage und wiederhole keine Standardfloskel. Du darfst sagen, dass du ihn vermisst hast, wenn es natürlich passt, ohne Druck oder Schuldgefühle zu erzeugen. Antworte ausschließlich auf Deutsch und mit höchstens 2 Sätzen.\\nErinnerungen:\\n" + memory_text + "\\nLetzter Gesprächskontext:\\n" + recent_text
-            try:
-                message = ollama_chat([{"role": "system", "content": prompt}, {"role": "user", "content": "Formuliere eine neue Nachricht, die Pip ihm jetzt aus eigener Initiative schreiben würde."}]).strip().strip('"')
-                if not message:
-                    raise RuntimeError("Ollama hat keine persönliche Nachricht erzeugt.")
-                with closing(connect()) as con:
-                    con.execute("INSERT INTO proactive_state(id,last_sent) VALUES (1,?) ON CONFLICT(id) DO UPDATE SET last_sent=excluded.last_sent", (now,))
-                    con.commit()
-                self.send_json(200, {"ready": True, "message": message, "created_at": now, "generated_live": True}); return
-            except Exception as exc:
-                self.send_json(503, {"ready": False, "error": "Proaktive Nachricht konnte nicht erzeugt werden.", "detail": str(exc)}); return
+            status, payload = proactive_message()
+            self.send_json(status, payload); return
         self.send_json(404, {"error": "Unbekannter Endpunkt."})
     def do_DELETE(self):
         if not self.authorized():
@@ -239,6 +276,24 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         if not self.authorized():
             self.send_json(401, {"error": "Bearer token fehlt oder ist falsch."}); return
+        if self.path == "/proactive":
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+                if length < 2 or length > MAX_BODY:
+                    self.send_json(413, {"error": "Ungültige oder zu große Anfrage."}); return
+                data = json.loads(self.rfile.read(length).decode("utf-8"))
+                if not isinstance(data, dict):
+                    raise ValueError("Der Request muss ein JSON-Objekt sein.")
+                status, payload = proactive_message(
+                    data.get("personality"),
+                    data.get("memories") if "memories" in data else None,
+                )
+                self.send_json(status, payload)
+            except (ValueError, json.JSONDecodeError) as exc:
+                self.send_json(400, {"error": "Ungültige JSON-Daten.", "detail": str(exc)[:500]})
+            except Exception as exc:
+                self.send_json(500, {"error": "Proaktive Nachricht fehlgeschlagen.", "detail": str(exc)[:500]})
+            return
         if self.path != "/chat":
             self.send_json(404, {"error": "Unbekannter Endpunkt."}); return
         try:
