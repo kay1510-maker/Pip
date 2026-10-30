@@ -38,6 +38,7 @@ jobs:
           patch = Path(".github/scripts/patch-pip-quality.py").read_text(encoding="utf-8")
           tests = Path(".github/scripts/test-pip-source.py").read_text(encoding="utf-8")
           build = Path(".github/workflows/build-apk.yml").read_text(encoding="utf-8")
+          server = Path("pc-server/pip_server.py").read_text(encoding="utf-8")
           header = build.split("jobs:", 1)[0]
 
           uses_in_process_settings_test = "getLastSettingsDialogForTest" in patch
@@ -54,6 +55,21 @@ jobs:
               "static source contracts cover the settings test": (
                   "getLastSettingsDialogForTest" in tests
                   or "missing UI controls capture accessibility hierarchy" in tests
+              ),
+              "PC proactive worker sends authenticated live requests": (
+                  'URL("$base/proactive")' in patch
+                  and 'setRequestProperty("Authorization", "Bearer $token")' in patch
+                  and 'payload.put("personality", personality)' in patch
+                  and 'payload.put("memories", memories)' in patch
+              ),
+              "PC server accepts authenticated proactive POST requests": (
+                  "def do_POST(self):" in server
+                  and "if not self.authorized()" in server
+                  and 'if self.path == "/proactive":' in server
+                  and "proactive_message(" in server
+              ),
+              "static source contracts cover proactive notifications": (
+                  "PC proactive reminders use the authenticated live endpoint" in tests
               ),
               "APK build is branch-scoped and manually dispatchable": (
                   "workflow_dispatch:" in header
