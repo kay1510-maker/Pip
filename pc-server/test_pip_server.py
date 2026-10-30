@@ -59,6 +59,17 @@ class PipServerTests(unittest.TestCase):
             body = exc.read()
             return exc.code, json.loads(body.decode("utf-8")) if body else {}
 
+    def seed_user_message(self, created_at):
+        con = pip_server.connect()
+        try:
+            con.execute(
+                "INSERT INTO messages(session_id,role,content,created_at) VALUES (?,?,?,?)",
+                ("phone-proactive", "user", "Letzter Gesprächsbeitrag", created_at),
+            )
+            con.commit()
+        finally:
+            con.close()
+
     def test_health_is_available_without_authentication(self):
         status, body = self.request("/health", token=None)
         self.assertEqual(status, 200)
@@ -174,6 +185,78 @@ class PipServerTests(unittest.TestCase):
             )
         self.assertEqual(status, 503)
         self.assertIn("Ollama ist nicht erreichbar", body["error"])
+
+
+    def test_proactive_endpoint_requires_bearer_token_for_get_and_post(self):
+        status, _ = self.request("/proactive", token=None)
+        self.assertEqual(status, 401)
+        status, _ = self.request(
+            "/proactive", method="POST",
+            payload={"personality": {}, "memories": []}, token=None,
+        )
+        self.assertEqual(status, 401)
+
+    def test_proactive_waits_for_idle_threshold_without_calling_ollama(self):
+        now = 2_000_000
+        self.seed_user_message(now - 3600)
+        with patch.object(pip_server.time, "time", return_value=now):
+            status, body = self.request(
+                "/proactive", method="POST",
+                payload={"personality": {"name": "Pipchen"}, "memories": []},
+            )
+        self.assertEqual(status, 200)
+        self.assertFalse(body["ready"])
+        self.assertEqual(body["reason"], "not_long_enough")
+        self.assertEqual(self.calls, [])
+
+    def test_proactive_uses_android_personality_and_memory_snapshot_then_respects_cooldown(self):
+        now = 2_000_000
+        self.seed_user_message(now - 25 * 3600)
+        payload = {
+            "personality": {
+                "name": "Pipchen",
+                "initiative": 91,
+                "humor": 42,
+                "romance": 73,
+                "jealousy": 8,
+            },
+            "memories": [{"category": "Vorliebe", "content": "Ich mag Tee."}],
+        }
+        with patch.object(pip_server.time, "time", return_value=now):
+            status, body = self.request("/proactive", method="POST", payload=payload)
+            self.assertEqual(status, 200)
+            self.assertTrue(body["ready"])
+            self.assertTrue(body["generated_live"])
+            self.assertEqual(body["message"], "Testantwort 1")
+            system_prompt = self.calls[0][0]["content"]
+            self.assertIn("Dein Name ist Pipchen", system_prompt)
+            self.assertIn("Eigeninitiative 91/100", system_prompt)
+            self.assertIn("Humor 42/100", system_prompt)
+            self.assertIn("Romantik/Flirt 73/100", system_prompt)
+            self.assertIn("spielerische Eifersucht 8/100", system_prompt)
+            self.assertIn("Vorliebe: Ich mag Tee.", system_prompt)
+
+            status, body = self.request("/proactive", method="POST", payload=payload)
+        self.assertEqual(status, 200)
+        self.assertFalse(body["ready"])
+        self.assertEqual(body["reason"], "cooldown")
+        self.assertEqual(len(self.calls), 1)
+
+    def test_proactive_ollama_failure_does_not_start_cooldown(self):
+        now = 2_000_000
+        self.seed_user_message(now - 25 * 3600)
+        payload = {"personality": {"name": "Pip"}, "memories": []}
+        with patch.object(pip_server.time, "time", return_value=now):
+            with patch.object(pip_server, "ollama_chat", side_effect=urllib.error.URLError("offline")):
+                status, body = self.request("/proactive", method="POST", payload=payload)
+            self.assertEqual(status, 503)
+            self.assertFalse(body["ready"])
+
+            status, body = self.request("/proactive", method="POST", payload=payload)
+        self.assertEqual(status, 200)
+        self.assertTrue(body["ready"])
+        self.assertEqual(body["message"], "Testantwort 1")
+        self.assertEqual(len(self.calls), 1)
 
 
 if __name__ == "__main__":
