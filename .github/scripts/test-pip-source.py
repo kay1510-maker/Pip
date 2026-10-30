@@ -114,6 +114,7 @@ checks.update({
     ),
 
     "PC endpoint restricted to private/local addresses": all(x in main for x in ("isLoopbackAddress", "isSiteLocalAddress", "isLinkLocalAddress")),
+    "PC backend receives Android personality and local memory snapshot": all(x in main for x in ('.put("personality", personality)', '.put("memories", memorySnapshot)')),
     "PC memory sync is opt-in and follows local save": (
         'db.remember("Von dir gemerkt", explicitMemory, 3)' in ask_source
         and ask_source.index('db.remember("Von dir gemerkt", explicitMemory, 3)') < ask_source.index("askWithPc(q)")

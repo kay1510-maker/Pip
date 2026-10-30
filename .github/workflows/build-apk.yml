@@ -1,7 +1,10 @@
 name: Build Pip APK
 
 on:
-  # APK builds are manual only; no automatic runs on push or pull requests.
+  # Run the full APK and emulator suite only on the integration branch; main is unaffected.
+  push:
+    branches:
+      - pip-spec-2026-10-25
   workflow_dispatch:
 
 concurrency:

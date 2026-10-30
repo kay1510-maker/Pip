@@ -419,6 +419,38 @@ main, n = re.subn(on_destroy_pattern, ensure_on_destroy_cleanup, main, count=1, 
 if n != 1:
     raise SystemExit("Could not safely extend existing onDestroy cleanup")
 
+
+# Keep the optional PC brain in sync with Android conversation settings and local memories.
+# The phone remains the source of truth; snapshots also propagate edits and deletions.
+pc_payload_marker = """            val body = org.json.JSONObject()
+                .put("message", q)
+                .put("session_id", "handy-1")
+                .toString().toByteArray(Charsets.UTF_8)"""
+pc_payload_replacement = """            val memorySnapshot = org.json.JSONArray()
+            val memoryCursor = db.listMemories()
+            try {
+                while (memoryCursor.moveToNext() && memorySnapshot.length() < 50) {
+                    memorySnapshot.put(org.json.JSONObject()
+                        .put("category", memoryCursor.getString(1) ?: "Erinnerung")
+                        .put("content", memoryCursor.getString(2) ?: ""))
+                }
+            } finally {
+                memoryCursor.close()
+            }
+            val personality = org.json.JSONObject()
+                .put("name", prefs.getString("pip_name", "Pip") ?: "Pip")
+                .put("initiative", prefs.getInt("initiative", 70).coerceIn(0, 100))
+                .put("humor", prefs.getInt("humor", 65).coerceIn(0, 100))
+                .put("romance", prefs.getInt("romance", 60).coerceIn(0, 100))
+                .put("jealousy", prefs.getInt("jealousy", 20).coerceIn(0, 100))
+            val body = org.json.JSONObject()
+                .put("message", q)
+                .put("session_id", "handy-1")
+                .put("personality", personality)
+                .put("memories", memorySnapshot)
+                .toString().toByteArray(Charsets.UTF_8)"""
+main = replace_once(main, pc_payload_marker, pc_payload_replacement, "sync Android personality and memories with PC backend")
+
 main_path.write_text(main, encoding="utf-8")
 
 # Quiet hours are evaluated in the device's local time; if the periodic job lands in the quiet window, skip it.

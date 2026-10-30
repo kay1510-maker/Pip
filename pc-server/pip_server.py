@@ -39,13 +39,65 @@ def connect():
     con = sqlite3.connect(DB_PATH, timeout=10)
     con.row_factory = sqlite3.Row
     con.execute("CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY AUTOINCREMENT, session_id TEXT NOT NULL, role TEXT NOT NULL, content TEXT NOT NULL, created_at INTEGER NOT NULL)")
-    con.execute("CREATE TABLE IF NOT EXISTS memories (id INTEGER PRIMARY KEY AUTOINCREMENT, content TEXT NOT NULL, created_at INTEGER NOT NULL)")
+    con.execute("CREATE TABLE IF NOT EXISTS memories (id INTEGER PRIMARY KEY AUTOINCREMENT, category TEXT NOT NULL DEFAULT 'Erinnerung', content TEXT NOT NULL, created_at INTEGER NOT NULL)")
+    memory_columns = {row["name"] for row in con.execute("PRAGMA table_info(memories)")}
+    if "category" not in memory_columns:
+        con.execute("ALTER TABLE memories ADD COLUMN category TEXT NOT NULL DEFAULT 'Erinnerung'")
     con.execute("CREATE TABLE IF NOT EXISTS proactive_state (id INTEGER PRIMARY KEY CHECK (id=1), last_sent INTEGER NOT NULL DEFAULT 0)")
     con.commit()
     return con
 
 def encoded(obj):
     return json.dumps(obj, ensure_ascii=False).encode("utf-8")
+
+def build_system_prompt(personality):
+    settings = personality if isinstance(personality, dict) else {}
+    raw_name = re.sub(r"[\x00-\x1f\x7f]", " ", str(settings.get("name", "Pip")))
+    name = re.sub(r"\s+", " ", raw_name).strip()[:24] or "Pip"
+
+    def level(key, default):
+        value = settings.get(key, default)
+        if isinstance(value, bool):
+            return default
+        try:
+            return max(0, min(100, int(value)))
+        except (TypeError, ValueError):
+            return default
+
+    initiative = level("initiative", 70)
+    humor = level("humor", 65)
+    romance = level("romance", 60)
+    jealousy = level("jealousy", 20)
+    return (
+        SYSTEM_PROMPT
+        + f"\n\nDein Name ist {name}. Sprich mit dem Nutzer wie in einem vertrauten privaten Chat."
+        + f"\nGesprächsstil: Eigeninitiative {initiative}/100, Humor {humor}/100, "
+        + f"Romantik/Flirt {romance}/100, spielerische Eifersucht {jealousy}/100."
+        + "\nPasse die Intensität an die Situation an. Flirte nur, wenn es zum Gespräch passt; "
+        + "Eifersucht bleibt spielerisch und niemals kontrollierend. Erfinde keine gemeinsamen Erlebnisse."
+    )
+
+
+def replace_memory_snapshot(con, snapshot):
+    if not isinstance(snapshot, list):
+        raise ValueError("memories muss eine Liste sein.")
+    if len(snapshot) > 50:
+        raise ValueError("Es dürfen höchstens 50 Erinnerungen synchronisiert werden.")
+    now = int(time.time())
+    rows = []
+    for item in snapshot:
+        if not isinstance(item, dict):
+            raise ValueError("Jede Erinnerung muss ein Objekt sein.")
+        category = re.sub(r"\s+", " ", str(item.get("category") or "Erinnerung")).strip()[:60] or "Erinnerung"
+        content = re.sub(r"\s+", " ", str(item.get("content") or "")).strip()[:500]
+        if content:
+            rows.append((category, content, now))
+    con.execute("DELETE FROM memories")
+    con.executemany(
+        "INSERT INTO memories(category,content,created_at) VALUES (?,?,?)",
+        rows,
+    )
+
 
 def comfy_request(path, payload=None, timeout=30):
     data = None if payload is None else encoded(payload)
@@ -145,7 +197,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         if self.path == "/memories":
             with closing(connect()) as con:
-                rows = con.execute("SELECT id,content,created_at FROM memories ORDER BY id DESC LIMIT 200").fetchall()
+                rows = con.execute("SELECT id,category,content,created_at FROM memories ORDER BY id DESC LIMIT 200").fetchall()
             self.send_json(200, {"memories": [dict(r) for r in rows]}); return
         if self.path == "/proactive":
             # Generate the message live on this request; persist only the cooldown timestamp,
@@ -205,19 +257,24 @@ class Handler(BaseHTTPRequestHandler):
                 fact = explicit.group(1).strip()[:500]
                 reply = f"Mach ich. Ich merk mir: {fact}"
                 with closing(connect()) as con:
-                    con.execute("INSERT INTO memories(content,created_at) VALUES (?,?)", (fact, int(time.time())))
+                    if "memories" in data:
+                        replace_memory_snapshot(con, data["memories"])
+                    else:
+                        con.execute("INSERT INTO memories(category,content,created_at) VALUES (?,?,?)", ("Erinnerung", fact, int(time.time())))
                     con.execute("INSERT INTO messages(session_id,role,content,created_at) VALUES (?,?,?,?)", (session_id,"user",user_text,int(time.time())))
                     con.execute("INSERT INTO messages(session_id,role,content,created_at) VALUES (?,?,?,?)", (session_id,"assistant",reply,int(time.time())))
                     con.commit()
                 self.send_json(200, {"reply": reply, "memory_saved": True}); return
             with closing(connect()) as con:
+                if "memories" in data:
+                    replace_memory_snapshot(con, data["memories"])
                 mem = con.execute("SELECT content FROM memories ORDER BY id DESC LIMIT 30").fetchall()
                 history = con.execute("SELECT role,content FROM messages WHERE session_id=? ORDER BY id DESC LIMIT ?", (session_id,MAX_HISTORY)).fetchall()
                 history = list(reversed(history))
                 con.execute("INSERT INTO messages(session_id,role,content,created_at) VALUES (?,?,?,?)", (session_id,"user",user_text,int(time.time())))
                 con.commit()
             memory_text = "\n".join("- " + r["content"] for r in mem) or "Noch keine gespeicherten Erinnerungen."
-            messages = [{"role":"system","content":SYSTEM_PROMPT + "\n\nTatsächlich gespeicherte Erinnerungen über den Nutzer:\n" + memory_text}]
+            messages = [{"role":"system","content":build_system_prompt(data.get("personality")) + "\n\nTatsächlich gespeicherte Erinnerungen über den Nutzer:\n" + memory_text}]
             messages.extend({"role":r["role"],"content":r["content"]} for r in history)
             messages.append({"role":"user","content":user_text})
             reply = ollama_chat(messages)

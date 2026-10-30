@@ -106,6 +106,60 @@ class PipServerTests(unittest.TestCase):
         self.assertEqual(messages[-1]["content"], "Was mag ich?")
         self.assertTrue(any(m["content"] == "Merk dir: Ich mag Kaffee." for m in messages))
 
+    def test_android_personality_settings_are_applied_to_pc_prompt(self):
+        status, body = self.request(
+            "/chat", method="POST",
+            payload={
+                "message": "Hallo",
+                "session_id": "personality-1",
+                "personality": {
+                    "name": "Pipchen",
+                    "initiative": 91,
+                    "humor": 42,
+                    "romance": 73,
+                    "jealousy": 8,
+                },
+            },
+        )
+        self.assertEqual(status, 200)
+        system_prompt = self.calls[0][0]["content"]
+        self.assertIn("Dein Name ist Pipchen", system_prompt)
+        self.assertIn("Eigeninitiative 91/100", system_prompt)
+        self.assertIn("Humor 42/100", system_prompt)
+        self.assertIn("Romantik/Flirt 73/100", system_prompt)
+        self.assertIn("spielerische Eifersucht 8/100", system_prompt)
+
+    def test_android_memory_snapshot_replaces_pc_memory_and_propagates_deletion(self):
+        status, body = self.request(
+            "/chat", method="POST",
+            payload={"message": "Merk dir: Alter PC-Fakt", "session_id": "memory-sync"},
+        )
+        self.assertEqual(status, 200)
+        status, body = self.request(
+            "/chat", method="POST",
+            payload={
+                "message": "Was weißt du?",
+                "session_id": "memory-sync",
+                "memories": [{"category": "Vorliebe", "content": "Ich mag Tee."}],
+            },
+        )
+        self.assertEqual(status, 200)
+        self.assertIn("Ich mag Tee.", self.calls[-1][0]["content"])
+        status, body = self.request("/memories")
+        self.assertEqual(status, 200)
+        self.assertEqual(len(body["memories"]), 1)
+        self.assertEqual(body["memories"][0]["category"], "Vorliebe")
+        self.assertEqual(body["memories"][0]["content"], "Ich mag Tee.")
+
+        status, body = self.request(
+            "/chat", method="POST",
+            payload={"message": "Noch eine Nachricht", "session_id": "memory-sync", "memories": []},
+        )
+        self.assertEqual(status, 200)
+        status, body = self.request("/memories")
+        self.assertEqual(status, 200)
+        self.assertEqual(body["memories"], [])
+
     def test_invalid_json_and_empty_message_are_rejected(self):
         status, _ = self.request("/chat", method="POST", raw=b"{bad")
         self.assertEqual(status, 400)
