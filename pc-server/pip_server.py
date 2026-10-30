@@ -123,20 +123,20 @@ def proactive_message(personality=None, memory_snapshot=None):
             "SELECT role,content FROM messages ORDER BY id DESC LIMIT 8"
         ).fetchall()
 
-    memory_text = "\\n".join(
+    memory_text = "\n".join(
         f"- {row['category']}: {row['content']}" for row in memories
     ) or "Noch keine gespeicherten Erinnerungen."
-    recent_text = "\\n".join(
+    recent_text = "\n".join(
         row["role"] + ": " + row["content"] for row in reversed(recent)
     )
     prompt = (
         build_system_prompt(personality)
-        + "\\n\\nVerfasse jetzt selbst eine kurze, persönliche Nachricht, weil längere Zeit kein Gespräch stattfand. "
+        + "\n\nVerfasse jetzt selbst eine kurze, persönliche Nachricht, weil längere Zeit kein Gespräch stattfand. "
         + "Die Nachricht muss aus dem aktuellen Kontext und den Erinnerungen entstehen; verwende keine feste Vorlage "
         + "und wiederhole keine Standardfloskel. Du darfst sagen, dass du ihn vermisst hast, wenn es natürlich passt, "
         + "ohne Druck oder Schuldgefühle zu erzeugen. Antworte ausschließlich auf Deutsch und mit höchstens 2 Sätzen."
-        + "\\nErinnerungen:\\n" + memory_text
-        + "\\nLetzter Gesprächskontext:\\n" + recent_text
+        + "\nErinnerungen:\n" + memory_text
+        + "\nLetzter Gesprächskontext:\n" + recent_text
     )
     try:
         message = ollama_chat([
