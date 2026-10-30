@@ -209,6 +209,20 @@ class PipServerTests(unittest.TestCase):
         self.assertEqual(body["reason"], "not_long_enough")
         self.assertEqual(self.calls, [])
 
+    def test_proactive_uses_android_local_activity_when_pc_has_no_chat_history(self):
+        now = 2_000_000
+        payload = {
+            "personality": {"name": "Pipchen", "initiative": 84},
+            "memories": [],
+            "last_user_at": now - 25 * 3600,
+        }
+        with patch.object(pip_server.time, "time", return_value=now):
+            status, body = self.request("/proactive", method="POST", payload=payload)
+        self.assertEqual(status, 200)
+        self.assertTrue(body["ready"])
+        self.assertEqual(body["message"], "Testantwort 1")
+        self.assertEqual(len(self.calls), 1)
+
     def test_proactive_uses_android_personality_and_memory_snapshot_then_respects_cooldown(self):
         now = 2_000_000
         self.seed_user_message(now - 25 * 3600)
