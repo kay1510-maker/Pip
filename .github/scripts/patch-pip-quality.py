@@ -767,12 +767,12 @@ print("Pip-Qualitätsintegration angewendet: Gedächtnis, Sprache, Opt-in-Erinne
 # Expose the actual settings dialogs to in-process instrumentation tests.
 main = main_path.read_text(encoding="utf-8")
 field_anchor = "    private var model: Any? = null"
-if "lastSettingsDialogForTest" not in main:
+if "lastSettingsDialogForTestRef" not in main:
     if main.count(field_anchor) != 1:
         raise SystemExit("Could not safely add the settings-dialog test reference")
     main = main.replace(
         field_anchor,
-        field_anchor + "\n    private var lastSettingsDialogForTest: AlertDialog? = null",
+        field_anchor + "\n    private var lastSettingsDialogForTestRef: AlertDialog? = null",
         1,
     )
 
@@ -782,7 +782,7 @@ if "fun getLastSettingsDialogForTest()" not in main:
         raise SystemExit("Could not safely add the settings-dialog test accessor")
     main = main.replace(
         getter_anchor,
-        "    fun getLastSettingsDialogForTest(): AlertDialog? = lastSettingsDialogForTest\n\n" + getter_anchor,
+        "    fun getLastSettingsDialogForTest(): AlertDialog? = lastSettingsDialogForTestRef\n\n" + getter_anchor,
         1,
     )
 
@@ -791,12 +791,12 @@ def capture_settings_dialog(start_marker, end_marker, label):
     start = main.index(start_marker)
     end = main.index(end_marker, start)
     block = main[start:end]
-    if "lastSettingsDialogForTest = it" in block:
+    if "lastSettingsDialogForTestRef = it" in block:
         return
     show_at = block.rfind(".show()")
     if show_at < 0:
         raise SystemExit(label + ": dialog show call not found")
-    block = block[:show_at] + ".show().also { lastSettingsDialogForTest = it }" + block[show_at + len(".show()"):]
+    block = block[:show_at] + ".show().also { lastSettingsDialogForTestRef = it }" + block[show_at + len(".show()"):]
     main = main[:start] + block + main[end:]
 
 capture_settings_dialog("    private fun showPipSettings() {", "    private fun showNotificationSettings() {", "main settings dialog")
