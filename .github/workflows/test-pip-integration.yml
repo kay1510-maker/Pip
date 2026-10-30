@@ -44,7 +44,7 @@ jobs:
           checks = {
               "settings test generator uses the current focus-safe strategy": (
                   (
-                      "ActivityScenario.onActivity" in patch
+                      "scenario.onActivity" in patch
                       and "performClick()" in patch
                       and "UiDevice" not in patch
                   )
