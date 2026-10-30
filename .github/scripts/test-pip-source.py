@@ -168,6 +168,16 @@ checks.update({
             'payload.put("memories", memories)',
         )
     ),
+    "PC proactive requests include the local last-conversation timestamp": (
+        "lastConversationAt()" in db
+        and "lastConversationAt()" in worker
+        and 'payload.put("last_user_at", lastConversationAt / 1000L)' in worker
+    ),
+    "local-only reminder fallback waits for 24 hours of conversation inactivity": (
+        "localConversationIsIdle(context)" in worker
+        and "lastConversationAt()" in db
+        and "24L * 60L * 60L * 1000L" in worker
+    ),
     "PC proactive reminders respect idle gate and local-network boundary": (
         'if (!result.optBoolean("ready", false)) return null' in worker
         and all(item in worker for item in (
