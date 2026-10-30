@@ -100,7 +100,7 @@ def replace_memory_snapshot(con, snapshot):
 
 
 
-def proactive_message(personality=None, memory_snapshot=None):
+def proactive_message(personality=None, memory_snapshot=None, local_last_user_at=None):
     """Generate a live proactive message only after the idle and cooldown gates pass."""
     now = int(time.time())
     with closing(connect()) as con:
@@ -110,6 +110,14 @@ def proactive_message(personality=None, memory_snapshot=None):
         last_user = con.execute(
             "SELECT MAX(created_at) FROM messages WHERE role='user'"
         ).fetchone()[0]
+        if local_last_user_at is not None:
+            try:
+                local_last = int(local_last_user_at)
+            except (TypeError, ValueError) as exc:
+                raise ValueError("last_user_at muss ein Unix-Zeitstempel in Sekunden sein.") from exc
+            if local_last > 0:
+                local_last = min(local_last, now + 300)
+                last_user = max(int(last_user or 0), local_last)
         row = con.execute("SELECT last_sent FROM proactive_state WHERE id=1").fetchone()
         last_proactive = row["last_sent"] if row else 0
         if last_user is None or now - int(last_user) < max(1, PROACTIVE_AFTER_HOURS) * 3600:
@@ -287,6 +295,7 @@ class Handler(BaseHTTPRequestHandler):
                 status, payload = proactive_message(
                     data.get("personality"),
                     data.get("memories") if "memories" in data else None,
+                    data.get("last_user_at"),
                 )
                 self.send_json(status, payload)
             except (ValueError, json.JSONDecodeError) as exc:
