@@ -42,6 +42,7 @@ jobs:
           header = build.split("jobs:", 1)[0]
 
           uses_in_process_settings_test = "getLastSettingsDialogForTest" in patch
+          uses_in_process_settings_test = "getLastSettingsDialogForTest" in patch
           checks = {
               "settings test generator uses the current focus-safe strategy": (
                   (
@@ -67,6 +68,10 @@ jobs:
                   and "if not self.authorized()" in server
                   and 'if self.path == "/proactive":' in server
                   and "proactive_message(" in server
+              ),
+              "PC proactive prompt uses the same personality and memory snapshot": (
+                  "build_system_prompt(personality)" in server
+                  and "replace_memory_snapshot(con, memory_snapshot)" in server
               ),
               "static source contracts cover proactive notifications": (
                   "PC proactive reminders use the authenticated live endpoint" in tests
