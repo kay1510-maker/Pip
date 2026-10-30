@@ -731,7 +731,7 @@ public class PipUiInstrumentedTest {
 
                 AlertDialog menu = activity.getLastSettingsDialogForTest();
                 assertNotNull(menu);
-                assertEquals("Pip-Einstellungen", menu.getTitle().toString());
+                assertTrue("Settings dialog title must be visible", containsText(menu.getWindow().getDecorView(), "Pip-Einstellungen"));
                 assertEquals("Gesprächsstil anpassen", menu.getListView().getAdapter().getItem(0).toString());
                 selectItem(menu, 0);
 

@@ -55,6 +55,13 @@ checks.update({
             and "androidx.test.espresso.Espresso" not in ui_test_source
         )
     ),
+    "settings dialog title is read from the real dialog view": (
+        not use_in_process_settings_test
+        or (
+            'containsText(menu.getWindow().getDecorView(), "Pip-Einstellungen")' in ui_test_source
+            and "menu.getTitle()" not in ui_test_source
+        )
+    ),
     "settings dialog test seam is present when in-process mode is enabled": (
         not use_in_process_settings_test
         or ("getLastSettingsDialogForTest" in main and "getLastSettingsDialogForTest" in ui_test_source)
