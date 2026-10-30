@@ -40,14 +40,21 @@ jobs:
           build = Path(".github/workflows/build-apk.yml").read_text(encoding="utf-8")
           header = build.split("jobs:", 1)[0]
 
+          uses_in_process_settings_test = "getLastSettingsDialogForTest" in patch
           checks = {
-              "emulator screen timeout is extended": 'settings put system screen_off_timeout 600000' in patch,
-              "settings label uses emoji-insensitive matching": (
-                  'requireTextContains("Einstellungen & Gedächtnis")' in patch
-                  and "By.textContains(text)" in patch
+              "settings test generator uses the current focus-safe strategy": (
+                  (
+                      "ActivityScenario.onActivity" in patch
+                      and "performClick()" in patch
+                      and "UiDevice" not in patch
+                  )
+                  if uses_in_process_settings_test
+                  else ("device.dumpWindowHierarchy(" in patch and "uiautomator dump" not in patch)
               ),
-              "missing UI controls capture accessibility hierarchy": "device.dumpWindowHierarchy(" in patch and "uiautomator dump" not in patch,
-              "static source contracts cover the UI regression guard": "missing UI controls capture accessibility hierarchy" in tests,
+              "static source contracts cover the settings test": (
+                  "getLastSettingsDialogForTest" in tests
+                  or "missing UI controls capture accessibility hierarchy" in tests
+              ),
               "APK build is branch-scoped and manually dispatchable": (
                   "workflow_dispatch:" in header
                   and "pull_request:" not in header
