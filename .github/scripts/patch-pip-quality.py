@@ -222,7 +222,7 @@ notification_replacement = r"""    private fun showNotificationSettings() {
             setPadding(32, 8, 32, 0)
         }
         panel.addView(TextView(this).apply {
-            text = "Freiwillig und standardmäßig aus. Mit aktiviertem PC-Gehirn erstellt Pip die Nachricht live nach längerer Gesprächspause; sonst nutzt sie eine lokale Erinnerung. Ruhezeiten werden beachtet."
+            text = "Freiwillig und standardmäßig aus. Mit PC-Gehirn erstellt Pip die Nachricht live nach mindestens 24 Stunden Gesprächspause; ohne PC-Gehirn erscheint eine lokale Erinnerung ebenfalls erst nach mindestens 24 Stunden ohne Gespräch. Ruhezeiten werden beachtet."
         })
         val intervalDays = intArrayOf(1, 2, 7)
         val intervalLabels = arrayOf("Täglich", "Alle 2 Tage", "Wöchentlich")
@@ -610,6 +610,20 @@ public class PipMemoryDbInstrumentedTest {
         db = new PipMemoryDb(context);
         assertTrue(db.context(12).contains("Hinweis: Persistenz"));
     }
+
+    @Test public void lastConversationTimestampIgnoresOrdinaryMemoriesAndResets() {
+        long before = System.currentTimeMillis();
+        db.remember("Vorliebe", "Tee", 3);
+        assertEquals(0L, db.lastConversationAt());
+
+        db.remember("Gespräch", "Nutzer: Hallo | Pip: Hi", 1);
+        long last = db.lastConversationAt();
+        assertTrue(last >= before);
+        assertTrue(System.currentTimeMillis() - last < 5000L);
+
+        db.clearMemories();
+        assertEquals(0L, db.lastConversationAt());
+    }
 }
 """
 (test_dir / "PipMemoryDbInstrumentedTest.java").write_text(db_test, encoding="utf-8")
@@ -808,6 +822,28 @@ print("Settings instrumentation now drives the real activity view and AlertDialo
 
 
 # Make optional reminders use the same PC personality and memory when the PC brain is enabled.
+db_path = Path("pip-src/app/src/main/java/de/pip/companion/PipMemoryDb.java")
+db_source = db_path.read_text(encoding="utf-8")
+db_anchor = "    public String conversationHistory(int limit){"
+if "lastConversationAt()" not in db_source:
+    if db_source.count(db_anchor) != 1:
+        raise SystemExit("Could not safely add local conversation timestamp query")
+    db_method = """    public long lastConversationAt(){
+        Cursor c = getReadableDatabase().rawQuery(
+            "SELECT MAX(created) FROM memories WHERE category='Gespräch'", null);
+        long last = 0L;
+        try {
+            if (c.moveToFirst() && !c.isNull(0)) last = c.getLong(0);
+        } finally {
+            c.close();
+        }
+        return last;
+    }
+
+"""
+    db_source = db_source.replace(db_anchor, db_method + db_anchor, 1)
+    db_path.write_text(db_source, encoding="utf-8")
+
 worker_path.write_text(r"""package de.pip.companion
 
 import android.app.NotificationChannel
@@ -848,6 +884,7 @@ class PipReminderWorker(context: Context, params: WorkerParameters) : Worker(con
         val message = (if (prefs.getBoolean("pc_backend_enabled", false)) {
             createPcMessage(context, prefs)
         } else {
+            if (!localConversationIsIdle(context)) return Result.success()
             fallbackMessage()
         }) ?: return Result.success()
 
