@@ -44,7 +44,7 @@ checks.update({
     "settings UI test does not invoke the runtime permission controller": "GrantPermissionRule" not in ui_test_source,
     "settings UI test uses the active focus-safe strategy": (
         (
-            "ActivityScenario.onActivity" in ui_test_source
+            "scenario.onActivity" in ui_test_source
             and "performClick()" in ui_test_source
             and "UiDevice" not in ui_test_source
         )
