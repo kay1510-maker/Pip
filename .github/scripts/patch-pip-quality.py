@@ -845,11 +845,11 @@ class PipReminderWorker(context: Context, params: WorkerParameters) : Worker(con
         }
         if (inQuietHours) return Result.success()
 
-        val message = if (prefs.getBoolean("pc_backend_enabled", false)) {
+        val message = (if (prefs.getBoolean("pc_backend_enabled", false)) {
             createPcMessage(context, prefs)
         } else {
             fallbackMessage()
-        } ?: return Result.success()
+        }) ?: return Result.success()
 
         return try {
             val channelId = "pip_daily_ping"
