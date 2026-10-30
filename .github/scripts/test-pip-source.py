@@ -7,6 +7,8 @@ db = (JAVA / "PipMemoryDb.java").read_text(encoding="utf-8")
 worker = (JAVA / "PipReminderWorker.kt").read_text(encoding="utf-8")
 manifest = (ROOT / "AndroidManifest.xml").read_text(encoding="utf-8")
 gradle = Path("pip-src/app/build.gradle").read_text(encoding="utf-8")
+patch_script = Path(".github/scripts/patch-pip-quality.py").read_text(encoding="utf-8")
+use_in_process_settings_test = "getLastSettingsDialogForTest" in patch_script
 
 asr = main[main.index("private fun startListening()"):main.index("override fun onInit(statusCode: Int)")]
 checks = {
@@ -40,18 +42,38 @@ checks.update({
     "Android instrumentation runner configured": "androidx.test.runner.AndroidJUnitRunner" in gradle,
     "voice interaction stub is not shipped": "PipVoiceInteractionService" not in manifest and not (JAVA / "PipVoiceInteractionService.java").exists(),
     "settings UI test does not invoke the runtime permission controller": "GrantPermissionRule" not in ui_test_source,
-    "settings UI test uses UIAutomator instead of focus-dependent Espresso roots": "UiDevice.getInstance" in ui_test_source and "Until.findObject" in ui_test_source and "androidx.test.espresso.Espresso" not in ui_test_source,
-    "UIAutomator instrumentation dependency configured": "androidx.test.uiautomator:uiautomator:2.3.0" in gradle,
-    "settings UI test keeps emulator awake and avoids forcing Home": (
-        "settings put system screen_off_timeout 600000" in ui_test_source
-        and ui_test_source.count("device.wakeUp();") >= 2
-        and "device.pressHome();" not in ui_test_source
+    "settings UI test uses the active focus-safe strategy": (
+        (
+            "ActivityScenario.onActivity" in ui_test_source
+            and "performClick()" in ui_test_source
+            and "UiDevice" not in ui_test_source
+        )
+        if use_in_process_settings_test
+        else (
+            "UiDevice.getInstance" in ui_test_source
+            and "Until.findObject" in ui_test_source
+            and "androidx.test.espresso.Espresso" not in ui_test_source
+        )
     ),
-    "settings entry is matched without emoji-sensitive exact text": (
-        'requireTextContains("Einstellungen & Gedächtnis")' in ui_test_source
-        and "By.textContains(text)" in ui_test_source
+    "settings dialog test seam is present when in-process mode is enabled": (
+        not use_in_process_settings_test
+        or ("getLastSettingsDialogForTest" in main and "getLastSettingsDialogForTest" in ui_test_source)
     ),
-    "missing UI controls capture accessibility hierarchy without a second automation service": "device.dumpWindowHierarchy(" in ui_test_source and "uiautomator dump" not in ui_test_source,
+    "speech setting is exercised through the settings dialog": (
+        "Antworten laut vorlesen" in ui_test_source
+        and "speech_enabled" in ui_test_source
+        and "AlertDialog.BUTTON_POSITIVE" in ui_test_source
+    ) if use_in_process_settings_test else "speech_enabled" in ui_test_source,
+    "notification options remain opt-in": (
+        "Benachrichtigungen außerhalb der App" in ui_test_source
+        and "notifications_enabled" in ui_test_source
+        and "assertFalse" in ui_test_source
+    ),
+    "UIAutomator dependency matches the current test mode": (
+        "androidx.test.uiautomator:uiautomator:2.3.0" not in gradle
+        if use_in_process_settings_test
+        else "androidx.test.uiautomator:uiautomator:2.3.0" in gradle
+    ),
 })
 
 
