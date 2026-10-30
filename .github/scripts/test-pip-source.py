@@ -177,7 +177,7 @@ checks.update({
         "conversationHistory(8)" in worker
         and 'payload.put("recent_context", localRecentContext.take(6000))' in worker
     ),
-    "local-only reminder fallback requires a real 24-hour-old conversation": (
+    "local-only reminder fallback waits for 24 hours of conversation inactivity": (
         "localConversationIsIdle(context)" in worker
         and "private fun localConversationIsIdle(context: Context): Boolean" in worker
         and "lastConversationAt()" in db
