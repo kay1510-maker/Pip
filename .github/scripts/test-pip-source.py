@@ -141,6 +141,43 @@ checks.update({
     "PC replies use Android TTS rather than disabled Supertonic": (
         'tts.speak(displayAnswer' in main and "speakWithSupertonic(answer)" not in main
     ),
+    "PC proactive reminders use the authenticated live endpoint": all(
+        item in worker for item in (
+            'getBoolean("pc_backend_enabled", false)',
+            'URL("$base/proactive")',
+            'requestMethod = "POST"',
+            'setRequestProperty("Authorization", "Bearer $token")',
+            'optBoolean("ready", false)',
+        )
+    ),
+    "PC proactive messages receive current Android personality": all(
+        item in worker for item in (
+            'payload.put("personality", personality)',
+            '.put("initiative", prefs.getInt("initiative", 70))',
+            '.put("humor", prefs.getInt("humor", 65))',
+            '.put("romance", prefs.getInt("romance", 60))',
+            '.put("jealousy", prefs.getInt("jealousy", 20))',
+        )
+    ),
+    "PC proactive messages receive a bounded local memory snapshot": all(
+        item in worker for item in (
+            'PipMemoryDb(context)',
+            'cursor.getString(1)',
+            'cursor.getString(2)',
+            'memories.length() < 50',
+            'payload.put("memories", memories)',
+        )
+    ),
+    "PC proactive reminders respect idle gate and local-network boundary": (
+        'if (!result.optBoolean("ready", false)) return null' in worker
+        and all(item in worker for item in (
+            "isLoopbackAddress", "isSiteLocalAddress", "isLinkLocalAddress"
+        ))
+    ),
+    "static reminder text is used only when the PC brain is disabled": (
+        'if (prefs.getBoolean("pc_backend_enabled", false))' in worker
+        and "fallbackMessage()" in worker
+    ),
 
     "PC endpoint restricted to private/local addresses": all(x in main for x in ("isLoopbackAddress", "isSiteLocalAddress", "isLinkLocalAddress")),
     "PC backend receives Android personality and local memory snapshot": all(x in main for x in ('.put("personality", personality)', '.put("memories", memorySnapshot)')),
