@@ -78,6 +78,13 @@ checks.update({
         and "speech_enabled" in ui_test_source
         and "AlertDialog.BUTTON_POSITIVE" in ui_test_source
     ) if use_in_process_settings_test else "speech_enabled" in ui_test_source,
+    "settings persistence assertions read from the live activity context": (
+        not use_in_process_settings_test
+        or (
+            'assertFalse(activity.getSharedPreferences("pip_settings", Context.MODE_PRIVATE)' in ui_test_source
+            and 'assertEquals(82, activity.getSharedPreferences("pip_settings", Context.MODE_PRIVATE)' in ui_test_source
+        )
+    ),
     "notification options remain opt-in": (
         "Benachrichtigungen außerhalb der App" in ui_test_source
         and "notifications_enabled" in ui_test_source
