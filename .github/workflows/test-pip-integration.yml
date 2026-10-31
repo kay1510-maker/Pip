@@ -21,7 +21,7 @@ jobs:
             .github/scripts/patch-conversation.py \
             .github/scripts/patch-pip-quality.py \
             .github/scripts/test-pip-source.py
-      - name: UI-Testgenerator und manuelle APK-Ausführung absichern
+      - name: UI-Testgenerator und manuelle Workflow-Ausführung absichern
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -29,10 +29,13 @@ jobs:
           patch = Path(".github/scripts/patch-pip-quality.py").read_text(encoding="utf-8")
           tests = Path(".github/scripts/test-pip-source.py").read_text(encoding="utf-8")
           build = Path(".github/workflows/build-apk.yml").read_text(encoding="utf-8")
+          pc_workflow = Path(".github/workflows/test-pc-server.yml").read_text(encoding="utf-8")
+          integration_workflow = Path(".github/workflows/test-pip-integration.yml").read_text(encoding="utf-8")
           server = Path("pc-server/pip_server.py").read_text(encoding="utf-8")
-          header = build.split("jobs:", 1)[0]
+          build_header = build.split("jobs:", 1)[0]
+          pc_header = pc_workflow.split("jobs:", 1)[0]
+          integration_header = integration_workflow.split("jobs:", 1)[0]
 
-          uses_in_process_settings_test = "getLastSettingsDialogForTest" in patch
           uses_in_process_settings_test = "getLastSettingsDialogForTest" in patch
           checks = {
               "settings test generator uses the current focus-safe strategy": (
@@ -76,13 +79,21 @@ jobs:
                   and "PC proactive requests include recent local dialogue" in tests
                   and "local-only reminder fallback waits for 24 hours of conversation inactivity" in tests
               ),
-              "APK build is branch-scoped and manually dispatchable": (
-                  "workflow_dispatch:" in header
-                  and "pull_request:" not in header
-                  and "push:" in header
-                  and "pip-spec-2026-10-25" in header
-                  and "paths:" in header
-                  and "Pip-v4.9-Qwen-1.5B-Supertonic.zip" in header
+              "APK workflow is manual-only and still references the integrated source archive": (
+                  "workflow_dispatch:" in build_header
+                  and "pull_request:" not in build_header
+                  and "push:" not in build_header
+                  and "Pip-v4.9-Qwen-1.5B-Supertonic.zip" in build
+              ),
+              "PC server test workflow remains manual-only": (
+                  "workflow_dispatch:" in pc_header
+                  and "pull_request:" not in pc_header
+                  and "push:" not in pc_header
+              ),
+              "integration contract workflow remains manual-only": (
+                  "workflow_dispatch:" in integration_header
+                  and "pull_request:" not in integration_header
+                  and "push:" not in integration_header
               ),
           }
           for label, passed in checks.items():
