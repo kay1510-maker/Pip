@@ -745,9 +745,9 @@ public class PipUiInstrumentedTest {
                 initiative.setProgress(82);
                 style.getButton(AlertDialog.BUTTON_POSITIVE).performClick();
 
-                assertFalse(context.getSharedPreferences("pip_settings", Context.MODE_PRIVATE)
+                assertFalse(activity.getSharedPreferences("pip_settings", Context.MODE_PRIVATE)
                     .getBoolean("speech_enabled", true));
-                assertEquals(82, context.getSharedPreferences("pip_settings", Context.MODE_PRIVATE)
+                assertEquals(82, activity.getSharedPreferences("pip_settings", Context.MODE_PRIVATE)
                     .getInt("initiative", 70));
 
                 assertTrue(settingsButton.performClick());
@@ -763,10 +763,10 @@ public class PipUiInstrumentedTest {
                 assertTrue(containsText(dialogRoot, "Häufigkeit"));
                 assertTrue(containsText(dialogRoot, "Ruhezeit beginnt"));
                 assertTrue(containsText(dialogRoot, "Ruhezeit endet"));
-                assertFalse(context.getSharedPreferences("pip_settings", Context.MODE_PRIVATE)
+                assertFalse(activity.getSharedPreferences("pip_settings", Context.MODE_PRIVATE)
                     .getBoolean("notifications_enabled", false));
                 notifications.getButton(AlertDialog.BUTTON_POSITIVE).performClick();
-                assertFalse(context.getSharedPreferences("pip_settings", Context.MODE_PRIVATE)
+                assertFalse(activity.getSharedPreferences("pip_settings", Context.MODE_PRIVATE)
                     .getBoolean("notifications_enabled", false));
             });
         }
