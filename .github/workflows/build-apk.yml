@@ -7,6 +7,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 40
 
     steps:
       - name: Repository laden
@@ -38,6 +39,14 @@ jobs:
           mkdir -p pip-src
           unzip -q Pip-v4.9-Qwen-1.5B-Supertonic.zip -d pip-src
 
+      - name: Unveränderten Quellstand für Prüfung sichern
+        uses: actions/upload-artifact@v4
+        with:
+          name: Pip-Source-Original
+          path: pip-src/
+          if-no-files-found: error
+          retention-days: 7
+
       - name: App-Version für Android-Update erhöhen
         run: |
           python3 - <<'PY'
@@ -48,12 +57,12 @@ jobs:
           print("\n".join(line for line in s.splitlines() if "versionCode" in line or "versionName" in line))
           s2, n = re.subn(r'versionCode\s+\d+', 'versionCode 22', s, count=1)
           if n != 1:
-              raise SystemExit("versionCode konnte nicht sicher auf 18 gesetzt werden")
+              raise SystemExit("versionCode konnte nicht sicher auf 22 gesetzt werden")
           s2, n = re.subn(r'versionName\s+["\'][^"\']+["\']', 'versionName "1.0.8"', s2, count=1)
           if n != 1:
-              raise SystemExit("versionName konnte nicht sicher auf 1.0.5 gesetzt werden")
+              raise SystemExit("versionName konnte nicht sicher auf 1.0.8 gesetzt werden")
           p.write_text(s2, encoding="utf-8")
-          print("Android-Updateversion: 1.0.6 (versionCode 21)")
+          print("Android-Updateversion: 1.0.8 (versionCode 22)")
           PY
 
       - name: Pips Persönlichkeit erweitern
@@ -120,7 +129,7 @@ jobs:
           print("Modellinitialisierung und Inferenz werden gegen parallele Aufrufe geschützt.")
           PY
 
-      - name: Hey-Pip-Aktivierung und fortlaufendes Gespräch integrieren
+      - name: Manuelle Spracheingabe und Sprachfehler absichern
         run: python3 .github/scripts/patch-conversation.py
 
       - name: Absturz beim Laden der Supertonic-Stimme umgehen
@@ -169,7 +178,7 @@ jobs:
           print("Supertonic-Initialisierung wird für die Antwort umgangen; Android-TTS übernimmt.")
           PY
 
-      - name: Supertonic sicher aktivieren und Speicherlast begrenzen
+      - name: Supertonic-Ressourcen begrenzen (Antwortpfad bleibt Android-TTS)
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -199,7 +208,7 @@ jobs:
           s = s.replace(old_gen, new_gen, 1)
           s = s.replace("engine.generateWithConfigAndCallback(text, gen)", "engine.generateWithConfigAndCallback(speechText, gen)", 1)
           p.write_text(s, encoding="utf-8")
-          print("Supertonic wird für Antworten verwendet; CPU-Threads, Satzanzahl und Textlänge sind begrenzt.")
+          print("Supertonic-Ressourcen begrenzt; Android-TTS bleibt aktiv, bis ein Hörtest den Supertonic-Pfad freigibt.")
           PY
 
       - name: Qwen-0.5B-Modell und Speicherprüfung konfigurieren
@@ -225,6 +234,12 @@ jobs:
           print("Qwen 0.5B aktiv; Downloadprüfung auf geringeren Speicherbedarf angepasst.")
           PY
 
+      - name: Pip-Funktionen gemeinsam integrieren
+        run: python3 .github/scripts/integrate-pip.py
+
+      - name: Pip-Komponenten sicher verbinden
+        run: python3 .github/scripts/patch-pip-quality.py
+
       - name: Pip-Quellcode und Funktionen prüfen
         run: |
           echo "=== Projektdateien ==="
@@ -244,63 +259,6 @@ jobs:
           echo "=== Wakeword-/Modell-Referenzen ==="
           grep -RniE 'wake.?word|hey pip|VoiceInteractionService|sherpa|supertonic|qwen|gguf|model.*download|SpeechRecognizer|TextToSpeech' pip-src/app/src 2>/dev/null | head -n 240 || true
 
-      - name: Hey-Pip-Wakeword-Modell einbinden
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          mkdir -p pip-src/app/src/main/assets/hey_pip
-          curl --fail --silent --show-error -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/workflows/train-hey-pip.yml/runs?status=success&per_page=10" -o /tmp/runs.json
-          RUN_ID="$(python3 -c 'import json; d=json.load(open("/tmp/runs.json")); print(next(r["id"] for r in d["workflow_runs"] if r["conclusion"]=="success"))')"
-          curl --fail --silent --show-error -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/artifacts" -o /tmp/artifacts.json
-          ARTIFACT_ID="$(python3 -c 'import json; d=json.load(open("/tmp/artifacts.json")); print(next(a["id"] for a in d["artifacts"] if a["name"]=="Hey-Pip-Wakeword-Model"))')"
-          curl --fail --location --retry 3 -H "Authorization: Bearer $GH_TOKEN" \
-            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID/zip" -o /tmp/hey-pip.zip
-          unzip -oq /tmp/hey-pip.zip -d pip-src/app/src/main/assets/hey_pip
-          test -s pip-src/app/src/main/assets/hey_pip/wake.int8.onnx
-          test -s pip-src/app/src/main/assets/hey_pip/wake.json
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path("pip-src/app/build.gradle")
-          s = p.read_text()
-          dep = "    implementation 'com.microsoft.onnxruntime:onnxruntime-android:1.20.0'\n"
-          if dep.strip() not in s:
-              s = s.replace("dependencies {\n", "dependencies {\n" + dep, 1)
-          p.write_text(s)
-          print("ONNX Runtime Android und Hey-Pip-Modell sind im APK-Projekt vorbereitet.")
-          PY
-
-      - name: Doppelte ONNX-Nativbibliothek auflösen
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path("pip-src/app/build.gradle")
-          s = p.read_text()
-          block = """
-          android {
-              packaging {
-                  jniLibs {
-                      pickFirsts += [
-                          'lib/arm64-v8a/libonnxruntime.so',
-                          'lib/armeabi-v7a/libonnxruntime.so',
-                          'lib/x86/libonnxruntime.so',
-                          'lib/x86_64/libonnxruntime.so'
-                      ]
-                  }
-              }
-          }
-          """
-          if "pickFirsts += [" not in s:
-              # Insert packaging configuration into the existing android block.
-              marker = "    compileOptions {"
-              if marker not in s:
-                  raise SystemExit("Android-Block nicht gefunden")
-              s = s.replace(marker, block + "\n" + marker, 1)
-          p.write_text(s)
-          print("Gradle löst doppelte libonnxruntime.so-Dateien über pickFirsts auf.")
-          PY
-
       - name: Fehlende Sherpa-ONNX-Bibliothek ergänzen
         run: |
           mkdir -p pip-src/app/libs
@@ -310,21 +268,105 @@ jobs:
           test -s pip-src/app/libs/sherpa-onnx-1.13.7.aar
           ls -lh pip-src/app/libs/sherpa-onnx-1.13.7.aar
 
+      - name: Integrierte Pip-Verträge statisch testen
+        run: python3 .github/scripts/test-pip-source.py
+
+      - name: Integrierten Quellstand vor dem Build sichern
+        uses: actions/upload-artifact@v4
+        with:
+          name: Pip-Source-Patched
+          path: |
+            pip-src/
+            !pip-src/**/build/**
+            !pip-src/.gradle/**
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Pip APK bauen
         run: |
           gradle -p pip-src assembleDebug --no-daemon
 
+      - name: APK als Testkandidat sichern
+        uses: actions/upload-artifact@v4
+        with:
+          name: Pip-APK-Candidate
+          path: pip-src/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
+
       - name: APK prüfen
         run: |
+          set -euo pipefail
           APK="pip-src/app/build/outputs/apk/debug/app-debug.apk"
           test -s "$APK"
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | head -n 5
+          BADGING="$("$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK")"
+          printf '%s\n' "$BADGING" | grep -m 1 '^package:'
           "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -v 4 "$APK"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$APK"
 
-      - name: APK hochladen
+      - name: Pip-Instrumentierungstests auf Android-Emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        timeout-minutes: 20
+        with:
+          api-level: 34
+          # Run 208 timed out before sys.boot_completed; allow a longer boot window.
+          emulator-boot-timeout: 900
+          target: default
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          # Give the API 34 headless emulator more room and CPU on hosted runners.
+          emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot -memory 3072 -cores 4
+          script: |
+            # reactivecircus/android-emulator-runner executes this script with /bin/sh.
+            # Keep the prologue POSIX-compatible; Bash-only pipefail caused the test step to abort before tests ran.
+            set -eu
+            # Wake and unlock the headless emulator before Espresso; otherwise ActivityScenario can resume
+            # MainActivity without window focus and RootViewPicker fails before the first assertion.
+            adb shell input keyevent KEYCODE_WAKEUP || true
+            adb shell wm dismiss-keyguard || true
+            adb shell input keyevent 82 || true
+            sleep 2
+            # Build an x86_64-capable test APK; the distributable APK above remains arm64-only.
+            gradle -p pip-src assembleDebug -PpipEmulatorTests=true --no-daemon
+
+            # Keep the real Gradle exit code and collect device diagnostics even if
+            # Android's instrumentation process crashes before reporting a test.
+            if gradle -p pip-src connectedDebugAndroidTest -PpipEmulatorTests=true --no-daemon > pip-instrumentation-gradle.log 2>&1; then cat pip-instrumentation-gradle.log; else test_exit=$?; cat pip-instrumentation-gradle.log; adb logcat -d -b all -t 6000 > pip-emulator-logcat.txt || true; adb shell dumpsys activity > pip-emulator-activity.txt 2>&1 || true; echo "Android-Instrumentierung fehlgeschlagen (Exit $test_exit); Logcat und Gradle-Bericht wurden gesichert."; tail -n 200 pip-instrumentation-gradle.log || true; exit "$test_exit"; fi
+            adb logcat -d -b all -t 6000 > pip-emulator-logcat.txt || true
+
+            APK="pip-src/app/build/outputs/apk/debug/app-debug.apk"
+            PKG="de.pip.companion"
+            test -s "$APK"
+            grep -F "applicationId '$PKG'" pip-src/app/build.gradle
+            adb install -r "$APK"
+            adb shell am force-stop "$PKG" || true
+            adb shell monkey -p "$PKG" 1
+            sleep 15
+            if ! adb shell pidof "$PKG" >/dev/null; then
+              adb logcat -d -t 1200
+              echo "Pip blieb nach dem Start nicht aktiv."
+              exit 1
+            fi
+            CRASH_LOG="$(adb logcat -d -s AndroidRuntime:E)"
+            if printf '%s\n' "$CRASH_LOG" | grep -q 'FATAL EXCEPTION'; then
+              printf '%s\n' "$CRASH_LOG"
+              echo "AndroidRuntime meldete eine fatale Ausnahme beim Pip-Start."
+              exit 1
+            fi
+            echo "Pip-Instrumentierungstests bestanden; App blieb nach dem Start im Emulator aktiv."
+
+      - name: Android-Testberichte sichern
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: Pip-APK-Supertonic
-          path: pip-src/app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
+          name: Pip-Android-Testberichte
+          path: |
+            pip-src/app/build/reports/androidTests/connected/**
+            pip-src/app/build/outputs/androidTest-results/connected/**
+            pip-instrumentation-gradle.log
+            pip-emulator-logcat.txt
+            pip-emulator-activity.txt
+          if-no-files-found: ignore
+          retention-days: 7
+

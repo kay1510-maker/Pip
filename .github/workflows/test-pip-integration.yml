@@ -1,0 +1,105 @@
+name: Validate Pip integration scripts (no APK build)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  source-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Repository laden
+        uses: actions/checkout@v4
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Integrationsskripte auf Syntax prüfen
+        run: |
+          python -m py_compile \
+            .github/scripts/integrate-pip.py \
+            .github/scripts/patch-conversation.py \
+            .github/scripts/patch-pip-quality.py \
+            .github/scripts/test-pip-source.py
+      - name: UI-Testgenerator und manuelle Workflow-Ausführung absichern
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          patch = Path(".github/scripts/patch-pip-quality.py").read_text(encoding="utf-8")
+          tests = Path(".github/scripts/test-pip-source.py").read_text(encoding="utf-8")
+          build = Path(".github/workflows/build-apk.yml").read_text(encoding="utf-8")
+          pc_workflow = Path(".github/workflows/test-pc-server.yml").read_text(encoding="utf-8")
+          integration_workflow = Path(".github/workflows/test-pip-integration.yml").read_text(encoding="utf-8")
+          server = Path("pc-server/pip_server.py").read_text(encoding="utf-8")
+          build_header = build.split("jobs:", 1)[0]
+          pc_header = pc_workflow.split("jobs:", 1)[0]
+          integration_header = integration_workflow.split("jobs:", 1)[0]
+
+          uses_in_process_settings_test = "getLastSettingsDialogForTest" in patch
+          checks = {
+              "settings test generator uses the current focus-safe strategy": (
+                  (
+                      "scenario.onActivity" in patch
+                      and "performClick()" in patch
+                      and "UiDevice" not in patch
+                  )
+                  if uses_in_process_settings_test
+                  else ("device.dumpWindowHierarchy(" in patch and "uiautomator dump" not in patch)
+              ),
+              "static source contracts cover the settings test": (
+                  "getLastSettingsDialogForTest" in tests
+                  or "missing UI controls capture accessibility hierarchy" in tests
+              ),
+              "PC proactive worker sends authenticated live requests": (
+                  'URL("$base/proactive")' in patch
+                  and 'setRequestProperty("Authorization", "Bearer $token")' in patch
+                  and 'payload.put("personality", personality)' in patch
+                  and 'payload.put("memories", memories)' in patch
+                  and 'payload.put("last_user_at", lastConversationAt / 1000L)' in patch
+                  and 'payload.put("recent_context", localRecentContext.take(6000))' in patch
+              ),
+              "PC server accepts authenticated proactive POST requests": (
+                  "def do_POST(self):" in server
+                  and "if not self.authorized()" in server
+                  and 'if self.path == "/proactive":' in server
+                  and "proactive_message(" in server
+                  and 'data.get("last_user_at")' in server
+                  and 'data.get("recent_context")' in server
+              ),
+              "PC proactive prompt uses the same personality and memory snapshot": (
+                  "build_system_prompt(personality)" in server
+                  and "replace_memory_snapshot(con, memory_snapshot)" in server
+                  and "local_recent_context" in server
+              ),
+              "static source contracts cover proactive notifications": (
+                  "PC proactive reminders use the authenticated live endpoint" in tests
+                  and "PC proactive requests run only when notifications are enabled and outside quiet hours" in tests
+                  and "PC proactive requests include the local last-conversation timestamp" in tests
+                  and "PC proactive requests include recent local dialogue" in tests
+                  and "local-only reminder fallback waits for 24 hours of conversation inactivity" in tests
+              ),
+              "APK workflow is manual-only and still references the integrated source archive": (
+                  "workflow_dispatch:" in build_header
+                  and "pull_request:" not in build_header
+                  and "push:" not in build_header
+                  and "Pip-v4.9-Qwen-1.5B-Supertonic.zip" in build
+              ),
+              "PC server test workflow remains manual-only": (
+                  "workflow_dispatch:" in pc_header
+                  and "pull_request:" not in pc_header
+                  and "push:" not in pc_header
+              ),
+              "integration contract workflow remains manual-only": (
+                  "workflow_dispatch:" in integration_header
+                  and "pull_request:" not in integration_header
+                  and "push:" not in integration_header
+              ),
+          }
+          for label, passed in checks.items():
+              print(f'{"PASS" if passed else "FAIL"}: {label}')
+          failed = [label for label, passed in checks.items() if not passed]
+          if failed:
+              raise SystemExit("Integration script checks failed: " + ", ".join(failed))
+          print(f"Passed {len(checks)} integration-script checks. No APK or device test was run by this workflow.")
+          PY
