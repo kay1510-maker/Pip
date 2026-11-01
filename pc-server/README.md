@@ -42,6 +42,7 @@ Wenn der PC ausgeschaltet oder nicht erreichbar ist, zeigt Pip einen Verbindungs
 - `/health` liefert ohne Token nur Dienst- und Modellstatus.
 - Erinnerungen liegen lokal in `pip_memory.sqlite3`. Der ausdrückliche Befehl „Merk dir …“ speichert einen Fakt. Die Android-App speichert Erinnerungen lokal zuerst und spiegelt explizite Merkvorgänge nur im aktivierten PC-Modus.
 - Chatantworten nutzen Ollamas lokale `/api/chat`-Schnittstelle. Standardmäßig werden `num_gpu=0`, begrenzter Kontext und ein Antwortlimit verwendet.
+- Der Server setzt zusätzlich `think: false`, damit Qwen3 seine interne Denkspur nicht als Chattext zurückliefert. Ein direkter `/api/generate`-Test ohne diese Option ist deshalb nicht mit dem Pip-Server-Chat vergleichbar. CPU-Inferenz vermeidet den bekannten CUDA/PTX-Pfad, kann auf älterer Hardware aber deutlich langsamer sein.
 - Die CI-Tests prüfen API, Authentifizierung, SQLite-Gedächtnis und Fehlerpfade mit einem simulierten Modellclient. Ein erfolgreicher CI-Test ersetzt keinen Test mit echtem Ollama, dem eigenen WLAN oder einem physischen Android-Gerät.
 - Die optionale Bildgenerierung über ComfyUI ist separat dokumentiert und wird nicht als Voraussetzung für den Textchat benötigt.
 
