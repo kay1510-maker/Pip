@@ -197,12 +197,18 @@ class PipServerTests(unittest.TestCase):
             return FakeResponse()
 
         messages = [{"role": "user", "content": "Sag Hallo"}]
-        with patch.object(pip_server, "OLLAMA_URL", "http://127.0.0.1:11434/api/chat"), \
-             patch.object(pip_server, "NUM_GPU", 0), \
-             patch.object(pip_server, "NUM_CTX", 4096), \
-             patch.object(pip_server, "NUM_PREDICT", 256), \
-             patch("pip_server.urllib.request.urlopen", side_effect=fake_urlopen):
-            reply = pip_server.ollama_chat(messages)
+        # setUp patches ollama_chat for the HTTP endpoint tests; restore the real
+        # function here so this test verifies the actual outgoing Ollama request.
+        self.chat_patch.stop()
+        try:
+            with patch.object(pip_server, "OLLAMA_URL", "http://127.0.0.1:11434/api/chat"), \
+                 patch.object(pip_server, "NUM_GPU", 0), \
+                 patch.object(pip_server, "NUM_CTX", 4096), \
+                 patch.object(pip_server, "NUM_PREDICT", 256), \
+                 patch("pip_server.urllib.request.urlopen", side_effect=fake_urlopen):
+                reply = pip_server.ollama_chat(messages)
+        finally:
+            self.chat_patch.start()
 
         self.assertEqual(reply, "Hallo Pip")
         self.assertEqual(captured["url"], "http://127.0.0.1:11434/api/chat")
