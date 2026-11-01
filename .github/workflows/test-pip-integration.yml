@@ -67,6 +67,8 @@ jobs:
                   and '"think": False' in server
                   and '"num_gpu": NUM_GPU' in server
                   and "test_ollama_chat_sends_configured_cpu_safe_options_and_disables_thinking" in pc_tests
+                  and "self.chat_patch.stop()" in pc_tests
+                  and "self.chat_patch.start()" in pc_tests
               ),
               "PC server accepts authenticated proactive POST requests": (
                   "def do_POST(self):" in server
