@@ -177,6 +177,46 @@ class PipServerTests(unittest.TestCase):
         status, _ = self.request("/chat", method="POST", payload={"message": "   "})
         self.assertEqual(status, 400)
 
+    def test_ollama_chat_sends_configured_cpu_safe_options_and_disables_thinking(self):
+        captured = {}
+
+        class FakeResponse:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+            def read(self):
+                return b'{"message":{"content":"Hallo Pip"}}'
+
+        def fake_urlopen(request, timeout):
+            captured["url"] = request.full_url
+            captured["timeout"] = timeout
+            captured["payload"] = json.loads(request.data.decode("utf-8"))
+            return FakeResponse()
+
+        messages = [{"role": "user", "content": "Sag Hallo"}]
+        with patch.object(pip_server, "OLLAMA_URL", "http://127.0.0.1:11434/api/chat"), \
+             patch.object(pip_server, "NUM_GPU", 0), \
+             patch.object(pip_server, "NUM_CTX", 4096), \
+             patch.object(pip_server, "NUM_PREDICT", 256), \
+             patch("pip_server.urllib.request.urlopen", side_effect=fake_urlopen):
+            reply = pip_server.ollama_chat(messages)
+
+        self.assertEqual(reply, "Hallo Pip")
+        self.assertEqual(captured["url"], "http://127.0.0.1:11434/api/chat")
+        self.assertEqual(captured["timeout"], 240)
+        payload = captured["payload"]
+        self.assertEqual(payload["model"], "test-qwen-model")
+        self.assertEqual(payload["messages"], messages)
+        self.assertFalse(payload["stream"])
+        self.assertEqual(payload["keep_alive"], "5m")
+        self.assertIs(payload["think"], False)
+        self.assertEqual(payload["options"]["num_gpu"], 0)
+        self.assertEqual(payload["options"]["num_ctx"], 4096)
+        self.assertEqual(payload["options"]["num_predict"], 256)
+
     def test_ollama_failure_returns_service_unavailable(self):
         with patch.object(pip_server, "ollama_chat", side_effect=urllib.error.URLError("offline")):
             status, body = self.request(
