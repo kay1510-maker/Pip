@@ -14,5 +14,5 @@ jobs:
           python-version: '3.12'
       - name: Syntax prüfen
         run: python -m py_compile pc-server/pip_server.py pc-server/test_pip_server.py
-      - name: API, Authentifizierung, Gedächtnis und Fehlerpfade testen
+      - name: API, Authentifizierung, Gedächtnis, CPU-Inferenz und Fehlerpfade testen
         run: python -m unittest discover -s pc-server -p 'test_*.py' -v
