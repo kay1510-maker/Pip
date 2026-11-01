@@ -32,6 +32,8 @@ jobs:
           pc_workflow = Path(".github/workflows/test-pc-server.yml").read_text(encoding="utf-8")
           integration_workflow = Path(".github/workflows/test-pip-integration.yml").read_text(encoding="utf-8")
           server = Path("pc-server/pip_server.py").read_text(encoding="utf-8")
+          pc_start = Path("pc-server/start-pip-server.ps1").read_text(encoding="utf-8")
+          pc_tests = Path("pc-server/test_pip_server.py").read_text(encoding="utf-8")
           build_header = build.split("jobs:", 1)[0]
           pc_header = pc_workflow.split("jobs:", 1)[0]
           integration_header = integration_workflow.split("jobs:", 1)[0]
@@ -58,6 +60,13 @@ jobs:
                   and 'payload.put("memories", memories)' in patch
                   and 'payload.put("last_user_at", lastConversationAt / 1000L)' in patch
                   and 'payload.put("recent_context", localRecentContext.take(6000))' in patch
+              ),
+              "PC server defaults to CPU inference and disables Qwen thinking": (
+                  'NUM_GPU = int(os.environ.get("PIP_NUM_GPU", "0"))' in server
+                  and '$env:PIP_NUM_GPU = "0"' in pc_start
+                  and '"think": False' in server
+                  and '"num_gpu": NUM_GPU' in server
+                  and "test_ollama_chat_sends_configured_cpu_safe_options_and_disables_thinking" in pc_tests
               ),
               "PC server accepts authenticated proactive POST requests": (
                   "def do_POST(self):" in server
