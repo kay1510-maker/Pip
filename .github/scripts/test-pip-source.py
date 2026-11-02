@@ -18,6 +18,15 @@ checks = {
     "recent conversation context separated": "WHERE category='Gespräch' ORDER BY created DESC LIMIT ?" in db and "Letzte Gespräche:" in db,
     "memory edit/delete/reset APIs": all(x in db for x in ("updateMemory(", "deleteMemory(", "clearMemories(")),
     "chat exposes memory management": all(x in main for x in ("showMemories()", "showEditMemory(", "db.clearMemories()")),
+    "memory list opens the actual editor with the selected record": all(
+        item in main for item in (
+            "val categories = ArrayList<String>()",
+            "val contents = ArrayList<String>()",
+            "showEditMemory(ids[which], categories[which], contents[which])",
+            "db.updateMemory(id, category, content)",
+            "db.deleteMemory(id)",
+        )
+    ),
     "ASR startup failure is caught": "catch (e: Throwable)" in asr and "createOnDeviceSpeechRecognizer" in asr,
     "text chat clears sent input": 'input.setText("")' in main and 'appendHistory("Kay", q)' in main,
     "speech preference is present": 'speech_enabled' in main and "speechSwitch.isChecked" in main,
