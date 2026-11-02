@@ -139,6 +139,12 @@ class PipServerTests(unittest.TestCase):
         self.assertIn("Humor 42/100", system_prompt)
         self.assertIn("Romantik/Flirt 73/100", system_prompt)
         self.assertIn("spielerische Eifersucht 8/100", system_prompt)
+        self.assertIn("NATÜRLICHKEIT IST WICHTIGER ALS PERFEKTE FORMULIERUNGEN", system_prompt)
+        self.assertIn("Vermeide Standard-Anfänge", system_prompt)
+        self.assertIn("ein bis drei natürliche Sätze", system_prompt)
+        self.assertIn("Erfinde keine Erinnerungen", system_prompt)
+        self.assertIn("Bei ernsten, traurigen oder dringenden Themen", system_prompt)
+        self.assertIn("Für Sprachausgabe", system_prompt)
 
     def test_android_memory_snapshot_replaces_pc_memory_and_propagates_deletion(self):
         status, body = self.request(
