@@ -183,6 +183,14 @@ class PipServerTests(unittest.TestCase):
         status, _ = self.request("/chat", method="POST", payload={"message": "   "})
         self.assertEqual(status, 400)
 
+    def test_chat_rejects_non_object_json_payloads(self):
+        for raw in (b"[]", b"null", b'"Hallo"'):
+            with self.subTest(raw=raw):
+                status, body = self.request("/chat", method="POST", raw=raw)
+                self.assertEqual(status, 400)
+                self.assertIn("JSON-Objekt", body["error"])
+        self.assertEqual(self.calls, [])
+
     def test_ollama_chat_sends_configured_cpu_safe_options_and_disables_thinking(self):
         captured = {}
 

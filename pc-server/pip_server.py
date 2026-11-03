@@ -321,6 +321,8 @@ class Handler(BaseHTTPRequestHandler):
             if length < 2 or length > MAX_BODY:
                 self.send_json(413, {"error": "Ungültige oder zu große Anfrage."}); return
             data = json.loads(self.rfile.read(length).decode("utf-8"))
+            if not isinstance(data, dict):
+                self.send_json(400, {"error": "Der Request muss ein JSON-Objekt sein."}); return
             user_text = str(data.get("message", "")).strip()
             session_id = str(data.get("session_id", "default"))[:80]
             if not user_text:
