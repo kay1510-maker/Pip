@@ -248,8 +248,12 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
     def authorized(self):
-        supplied = self.headers.get("Authorization", "").removeprefix("Bearer ").strip()
-        return bool(TOKEN) and secrets.compare_digest(supplied, TOKEN)
+        # HTTP auth schemes are case-insensitive, but a bare token or another
+        # scheme must never be accepted as a Bearer credential.
+        parts = self.headers.get("Authorization", "").strip().split()
+        if len(parts) != 2 or parts[0].casefold() != "bearer":
+            return False
+        return bool(TOKEN) and secrets.compare_digest(parts[1], TOKEN)
     def do_GET(self):
         if self.path == "/health":
             self.send_json(200, {"ok": True, "service": "Pip PC brain", "model": MODEL})
