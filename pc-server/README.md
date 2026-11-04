@@ -38,6 +38,7 @@ Wenn der PC ausgeschaltet oder nicht erreichbar ist, zeigt Pip einen Verbindungs
 
 - Der Server lauscht standardmäßig auf `0.0.0.0:8765`, damit das Handy im Heimnetz zugreifen kann. Beschränke die Windows-Firewall auf das private Heimnetz.
 - HTTP im Heimnetz ist unverschlüsselt: Ein Token kann im selben Netzwerk mitgeschnitten werden. Nur in einem vertrauenswürdigen privaten Netz verwenden.
+- Der Server akzeptiert Zugangsdaten ausschließlich als HTTP-Header `Authorization: Bearer <Token>`. Das Bearer-Schema wird gemäß HTTP-Konvention ohne Beachtung der Groß-/Kleinschreibung erkannt; ein nacktes Token oder ein anderes Authentifizierungsschema wird abgewiesen.
 - Port 8765 und Ollamas Port 11434 niemals direkt ins Internet weiterleiten.
 - `/health` liefert ohne Token nur Dienst- und Modellstatus.
 - Erinnerungen liegen lokal in `pip_memory.sqlite3`. Der ausdrückliche Befehl „Merk dir …“ speichert einen Fakt. Die Android-App speichert Erinnerungen lokal zuerst und spiegelt explizite Merkvorgänge nur im aktivierten PC-Modus.
