@@ -41,12 +41,14 @@ class PipServerTests(unittest.TestCase):
         self.calls.append(messages)
         return f"Testantwort {len(self.calls)}"
 
-    def request(self, path, method="GET", payload=None, token="test-secret-token-for-unit-tests", raw=None):
+    def request(self, path, method="GET", payload=None, token="test-secret-token-for-unit-tests", raw=None, authorization=None):
         data = raw
         if data is None and payload is not None:
             data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         headers = {}
-        if token is not None:
+        if authorization is not None:
+            headers["Authorization"] = authorization
+        elif token is not None:
             headers["Authorization"] = "Bearer " + token
         if data is not None:
             headers["Content-Type"] = "application/json"
@@ -81,6 +83,25 @@ class PipServerTests(unittest.TestCase):
         self.assertEqual(status, 401)
         status, _ = self.request("/memories", token="wrong-token")
         self.assertEqual(status, 401)
+
+    def test_bearer_authorization_requires_scheme_and_accepts_case_insensitive_scheme(self):
+        invalid_headers = (
+            "test-secret-token-for-unit-tests",
+            "Basic test-secret-token-for-unit-tests",
+            "Bearer",
+            "Bearer test-secret-token-for-unit-tests extra",
+        )
+        for header in invalid_headers:
+            with self.subTest(authorization=header):
+                status, _ = self.request("/memories", authorization=header)
+                self.assertEqual(status, 401)
+
+        status, body = self.request(
+            "/memories",
+            authorization="bearer test-secret-token-for-unit-tests",
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(body["memories"], [])
 
     def test_explicit_memory_is_saved_and_can_be_deleted(self):
         status, body = self.request(
