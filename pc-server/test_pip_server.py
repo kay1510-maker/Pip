@@ -339,6 +339,49 @@ class PipServerTests(unittest.TestCase):
         self.assertEqual(body["reason"], "cooldown")
         self.assertEqual(len(self.calls), 1)
 
+    def test_concurrent_proactive_requests_do_not_generate_duplicate_messages(self):
+        now = 2_000_000
+        self.seed_user_message(now - 25 * 3600)
+        generation_started = threading.Event()
+        allow_generation_to_finish = threading.Event()
+        responses = []
+
+        def slow_chat(messages):
+            self.calls.append(messages)
+            generation_started.set()
+            if not allow_generation_to_finish.wait(timeout=4):
+                raise RuntimeError("Testfreigabe für die Modellantwort kam nicht rechtzeitig.")
+            return "Nur eine proaktive Nachricht"
+
+        payload = {"personality": {"name": "Pip"}, "memories": []}
+        with patch.object(pip_server.time, "time", return_value=now), \
+             patch.object(pip_server, "ollama_chat", side_effect=slow_chat):
+            first = threading.Thread(
+                target=lambda: responses.append(
+                    self.request("/proactive", method="POST", payload=payload)
+                ),
+                daemon=True,
+            )
+            first.start()
+            self.assertTrue(generation_started.wait(timeout=2))
+
+            second_status, second_body = self.request(
+                "/proactive", method="POST", payload=payload
+            )
+            self.assertEqual(second_status, 200)
+            self.assertFalse(second_body["ready"])
+            self.assertEqual(second_body["reason"], "generation_in_progress")
+
+            allow_generation_to_finish.set()
+            first.join(timeout=5)
+
+        self.assertFalse(first.is_alive(), "Die erste proaktive Anfrage muss beendet sein.")
+        self.assertEqual(len(responses), 1)
+        self.assertEqual(responses[0][0], 200)
+        self.assertTrue(responses[0][1]["ready"])
+        self.assertEqual(responses[0][1]["message"], "Nur eine proaktive Nachricht")
+        self.assertEqual(len(self.calls), 1)
+
     def test_proactive_ollama_failure_does_not_start_cooldown(self):
         now = 2_000_000
         self.seed_user_message(now - 25 * 3600)

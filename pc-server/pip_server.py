@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Pip PC brain: local Ollama proxy and SQLite memory; Python standard library only."""
 from __future__ import annotations
-import json, os, re, secrets, sqlite3, time, urllib.error, urllib.parse, urllib.request
+import json, os, re, secrets, sqlite3, threading, time, urllib.error, urllib.parse, urllib.request
 from contextlib import closing
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -14,6 +14,7 @@ HOST = os.environ.get("PIP_HOST", "0.0.0.0")
 PORT = int(os.environ.get("PIP_PORT", "8765"))
 TOKEN = os.environ.get("PIP_TOKEN", "").strip()
 MAX_BODY, MAX_HISTORY = 64 * 1024, 16
+PROACTIVE_LOCK = threading.Lock()
 PROACTIVE_AFTER_HOURS = int(os.environ.get("PIP_PROACTIVE_AFTER_HOURS", "24"))
 PROACTIVE_COOLDOWN_HOURS = int(os.environ.get("PIP_PROACTIVE_COOLDOWN_HOURS", "24"))
 # Conservative defaults for this PC: CPU inference, smaller context and concise replies.
@@ -106,7 +107,7 @@ def replace_memory_snapshot(con, snapshot):
 
 
 
-def proactive_message(personality=None, memory_snapshot=None, local_last_user_at=None, local_recent_context=None):
+def _proactive_message_unlocked(personality=None, memory_snapshot=None, local_last_user_at=None, local_recent_context=None):
     """Generate a live proactive message only after the idle and cooldown gates pass."""
     now = int(time.time())
     with closing(connect()) as con:
@@ -177,6 +178,18 @@ def proactive_message(personality=None, memory_snapshot=None, local_last_user_at
             "error": "Proaktive Nachricht konnte nicht erzeugt werden.",
             "detail": str(exc)[:500],
         }
+
+def proactive_message(personality=None, memory_snapshot=None, local_last_user_at=None, local_recent_context=None):
+    """Prevent duplicate live notifications when concurrent workers hit this endpoint."""
+    if not PROACTIVE_LOCK.acquire(blocking=False):
+        return 200, {"ready": False, "reason": "generation_in_progress"}
+    try:
+        return _proactive_message_unlocked(
+            personality, memory_snapshot, local_last_user_at, local_recent_context
+        )
+    finally:
+        PROACTIVE_LOCK.release()
+
 
 def comfy_request(path, payload=None, timeout=30):
     data = None if payload is None else encoded(payload)

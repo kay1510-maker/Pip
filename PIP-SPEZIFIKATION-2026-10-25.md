@@ -311,3 +311,13 @@ Nach jedem Schritt wird der integrierte Projektstand gebaut und getestet, bevor 
 - `pc-server/test_pip_server.py` enthält einen Regressionstest für nackte Tokens, `Basic`, fehlende und zusätzliche Bestandteile sowie ein gültiges kleingeschriebenes `bearer`-Schema. Die README dokumentiert die tatsächliche Header-Regel.
 - **Verifikation offen:** Diese Änderung wurde über den GitHub-Quelltext geschrieben und anschließend erneut abgerufen; in dieser Ausführungsumgebung konnte kein Python-Unit-Testlauf für den aktuellen Commit gestartet werden. Die manuellen Workflows bleiben `workflow_dispatch`-only, und es gibt hier keine Aktion zum Starten eines neuen Dispatch-Laufs. Kein Test wird als bestanden ausgegeben.
 - `main` blieb unverändert; es wurde nichts gemergt. Der Draft-Pull-Request bleibt offen. Die integrierte App ist weiterhin nicht abgenommen, da APK-/Emulator-, echte Ollama-/LAN-, TTS-/ASR-, Gedächtnis-Neustart- und Benachrichtigungs-Gesamttests noch fehlen.
+
+
+## Nachtrag 05.11.2026 – parallele proaktive Anfragen
+
+- Bei der erneuten Prüfung des PC-Servers wurde ein Nebenläufigkeitsrisiko gefunden: `ThreadingHTTPServer` verarbeitet Requests parallel. Zwei gleichzeitig eintreffende `POST /proactive`-Anfragen konnten beide Idle- und Cooldown-Prüfung bestehen, bevor eine der Antworten den Zeitstempel `last_sent` speicherte. Das hätte doppelte Ollama-Generierungen und doppelte Benachrichtigungen ermöglichen können.
+- `proactive_message` verwendet jetzt eine nicht blockierende Prozesssperre. Während bereits eine Nachricht erzeugt wird, erhält eine parallele Anfrage `ready: false` mit `reason: generation_in_progress`; sie startet keine zweite Modellgenerierung. Nach Abschluss greifen weiterhin die persistente Cooldown-Prüfung und die bestehende Fehlerbehandlung.
+- Ein paralleler Regressionstest wurde ergänzt: Er hält die erste simulierte Ollama-Antwort an, sendet eine zweite Anfrage und prüft, dass nur eine Generierung erfolgt und die zweite Anfrage den Busy-Status erhält.
+- Sicherung vor dieser Änderung: `backup-pip-2026-11-05-before-proactive-concurrency-guard` auf dem bisherigen HEAD `8326c5fd4c6ba56d80d769c314f449e89a4228d6`.
+- Der neue Regressionstest wurde in dieser Umgebung nicht ausgeführt. Die drei Workflows sind weiterhin absichtlich nur über `workflow_dispatch` auslösbar; die verfügbaren GitHub-Aktionen können keinen neuen Dispatch starten. Daher gibt es noch keinen Build- oder Testnachweis für diesen Commit.
+- `main` bleibt unverändert. PR #2 bleibt Draft und ungemergt.
