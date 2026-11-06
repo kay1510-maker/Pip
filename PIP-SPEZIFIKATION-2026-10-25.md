@@ -332,3 +332,11 @@ Nach jedem Schritt wird der integrierte Projektstand gebaut und getestet, bevor 
 - **Verifikation offen:** Die Änderungen wurden über GitHub geschrieben. Der lokale Container hat weiterhin weder Gradle noch ADB/Android-SDK; GitHub ist aus dem Container wegen nicht auflösbarer DNS-Adresse nicht erreichbar. Die drei Workflows sind absichtlich `workflow_dispatch`-only, und die verfügbaren GitHub-Aktionen besitzen keine Dispatch-Aktion. Daher wurden weder Python-Unit-Tests noch Source-Contract, APK-Build oder Emulator-/Gerätetests für diesen Commit ausgeführt.
 - Die letzte verfügbare Actions-Historie enthält weiterhin nur Läufe bis 30.10.2026; Combined Status für den vorherigen HEAD war leer. Der neue Prompt-Test ist hinzugefügt, aber nicht als bestanden markiert.
 - Vor der Änderung wurde der bisherige HEAD `bba494a1c3e41afe502ad7d488cc9bd1801ecdd2` auf `backup/pip-2026-11-06-before-shared-personality-source` gesichert. `main` bleibt bei `19875fd31a67fc6b0cb464c8e4a3628aa995f1da`; es wurde nichts gemergt. PR #2 bleibt Draft.
+
+
+### Ergänzung 06.11.2026 – Schutzregeln der gemeinsamen Persönlichkeit
+
+- Beim Abgleich der gemeinsamen Prompt-Datei wurde darauf geachtet, die zuvor im PC-Prompt vorhandenen Grenzen nicht zu verlieren: Flirt bleibt kontextabhängig und ungefragt nicht explizit; Druck, Kontrolle, Drohungen, Schuldgefühle und manipulative emotionale Abhängigkeit sind ausgeschlossen. Erinnerungen müssen als tatsächlich bekannt, vermutet oder unbekannt unterscheidbar bleiben.
+- Der PC-Unit-Test und der manuelle Source-Contract prüfen diese Schutzregeln jetzt ausdrücklich. Auch diese Prüfungen sind noch nicht ausgeführt; sie sind nur im Quellstand ergänzt.
+- Korrekturcommits: Prompt `13d36c14a369687f64aa959395b6f750c8660734`, Unit-Test `eadf7e3d19a4c5244e1fe4cb6a047b6b2274c4d5` und Workflow-Guard `d0b409bbf1a9b16964c32e59551a94a09c60042f`.
+- Sicherung vor dieser Ergänzung: `backup/pip-2026-11-06-before-prompt-safeguards` auf dem HEAD `9efeaa399cff5b82df8e498d70f37ae52b1e3579`. `main` bleibt unverändert.
