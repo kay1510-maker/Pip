@@ -86,6 +86,9 @@ jobs:
                   and 'SYSTEM_PROMPT = PERSONALITY_PROMPT_PATH.read_text(encoding="utf-8").strip()' in server
                   and "test_pc_and_android_share_canonical_personality_source" in pc_tests
                   and "NATÜRLICHKEIT IST WICHTIGER ALS PERFEKTE FORMULIERUNGEN" in personality
+                  and "Flirte nur, wenn es zum Gespräch passt; ungefragt nicht explizit." in personality
+                  and "Erzeuge niemals Druck, Kontrolle, Drohungen, Schuldgefühle" in personality
+                  and "Unterscheide zwischen tatsächlicher Erinnerung, Vermutung und fehlendem Wissen." in personality
               ),
               "PC proactive prompt uses the same personality and memory snapshot": (
                   "build_system_prompt(personality)" in server
