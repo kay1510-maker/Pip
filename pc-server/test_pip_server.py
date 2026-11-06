@@ -149,6 +149,9 @@ class PipServerTests(unittest.TestCase):
             "Keine Standard-Anfänge",
             "Erfinde keine Erinnerungen",
             "Bei ernsten Problemen",
+            "Flirte nur, wenn es zum Gespräch passt; ungefragt nicht explizit.",
+            "Erzeuge niemals Druck, Kontrolle, Drohungen, Schuldgefühle",
+            "Unterscheide zwischen tatsächlicher Erinnerung, Vermutung und fehlendem Wissen.",
             "Romantik und einvernehmliches Flirten zwischen Erwachsenen",
         ):
             self.assertIn(required, pip_server.SYSTEM_PROMPT)
