@@ -321,3 +321,14 @@ Nach jedem Schritt wird der integrierte Projektstand gebaut und getestet, bevor 
 - Sicherung vor dieser Änderung: `backup-pip-2026-11-05-before-proactive-concurrency-guard` auf dem bisherigen HEAD `8326c5fd4c6ba56d80d769c314f449e89a4228d6`.
 - Der neue Regressionstest wurde in dieser Umgebung nicht ausgeführt. Die drei Workflows sind weiterhin absichtlich nur über `workflow_dispatch` auslösbar; die verfügbaren GitHub-Aktionen können keinen neuen Dispatch starten. Daher gibt es noch keinen Build- oder Testnachweis für diesen Commit.
 - `main` bleibt unverändert. PR #2 bleibt Draft und ungemergt.
+
+
+## Nachtrag 06.11.2026 – gemeinsame Persönlichkeitsquelle für Android und PC
+
+- Bei der Quellprüfung war eine inhaltliche Drift sichtbar: Android erhielt den ausführlichen, natürlich formulierten Pip-Text aus dem APK-Workflow, während der PC-Server eine separat gepflegte, kürzere Kopie verwendete. Beide Routen übernahmen zwar dieselben vier Stilregler, aber nicht denselben Grundprompt.
+- Die Persönlichkeitsdefinition liegt jetzt einmalig in `pc-server/pip-personality.txt`. Der PC-Server lädt sie beim Start aus dieser Datei; der Android-Build liest dieselbe Datei beim Ersetzen des Persönlichkeitstextes in `MainActivity.kt`. Die vorhandene Android-Persönlichkeitsintegration und die dynamischen Regler bleiben erhalten.
+- Ein PC-Unit-Test prüft, dass der Server exakt diese Datei lädt und dass die Kernregeln zu natürlichem Deutsch, Erinnerungswahrheit, ernsten Themen und einvernehmlichem Flirt vorhanden sind. Der manuelle Source-Contract-Workflow prüft zusätzlich, dass der APK-Workflow und der PC-Server auf dieselbe Datei zeigen.
+- Betroffene Dateien: `pc-server/pip-personality.txt` (neu), `pc-server/pip_server.py`, `pc-server/test_pip_server.py`, `.github/workflows/build-apk.yml`, `.github/workflows/test-pip-integration.yml`, `pc-server/README.md` und dieser Masterplan.
+- **Verifikation offen:** Die Änderungen wurden über GitHub geschrieben. Der lokale Container hat weiterhin weder Gradle noch ADB/Android-SDK; GitHub ist aus dem Container wegen nicht auflösbarer DNS-Adresse nicht erreichbar. Die drei Workflows sind absichtlich `workflow_dispatch`-only, und die verfügbaren GitHub-Aktionen besitzen keine Dispatch-Aktion. Daher wurden weder Python-Unit-Tests noch Source-Contract, APK-Build oder Emulator-/Gerätetests für diesen Commit ausgeführt.
+- Die letzte verfügbare Actions-Historie enthält weiterhin nur Läufe bis 30.10.2026; Combined Status für den vorherigen HEAD war leer. Der neue Prompt-Test ist hinzugefügt, aber nicht als bestanden markiert.
+- Vor der Änderung wurde der bisherige HEAD `bba494a1c3e41afe502ad7d488cc9bd1801ecdd2` auf `backup/pip-2026-11-06-before-shared-personality-source` gesichert. `main` bleibt bei `19875fd31a67fc6b0cb464c8e4a3628aa995f1da`; es wurde nichts gemergt. PR #2 bleibt Draft.

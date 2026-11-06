@@ -2,6 +2,8 @@
 
 Dieses Backend verbindet die Android-App Pip optional mit Ollama auf dem Windows-PC. Es verwendet lokale Modelle und Python-Standardbibliotheken; ein Cloud-Abo ist nicht erforderlich.
 
+Die gemeinsame Persönlichkeitsdefinition liegt in `pip-personality.txt`. Der PC-Server lädt diese Datei direkt; der Android-APK-Workflow liest dieselbe Datei beim Integrieren der App. So driften die beiden Modellrouten nicht durch zwei getrennt gepflegte Persönlichkeitstexte auseinander.
+
 ## Voraussetzungen
 
 - Windows 10/11 und Python 3.10+

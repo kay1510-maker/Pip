@@ -34,6 +34,7 @@ jobs:
           server = Path("pc-server/pip_server.py").read_text(encoding="utf-8")
           pc_start = Path("pc-server/start-pip-server.ps1").read_text(encoding="utf-8")
           pc_tests = Path("pc-server/test_pip_server.py").read_text(encoding="utf-8")
+          personality = Path("pc-server/pip-personality.txt").read_text(encoding="utf-8").strip()
           build_header = build.split("jobs:", 1)[0]
           pc_header = pc_workflow.split("jobs:", 1)[0]
           integration_header = integration_workflow.split("jobs:", 1)[0]
@@ -77,6 +78,14 @@ jobs:
                   and "proactive_message(" in server
                   and 'data.get("last_user_at")' in server
                   and 'data.get("recent_context")' in server
+              ),
+              "Android and PC load one canonical personality source": (
+                  bool(personality)
+                  and 'prompt_path = Path("pc-server/pip-personality.txt")' in build
+                  and 'PERSONALITY_PROMPT_PATH = ROOT / "pip-personality.txt"' in server
+                  and 'SYSTEM_PROMPT = PERSONALITY_PROMPT_PATH.read_text(encoding="utf-8").strip()' in server
+                  and "test_pc_and_android_share_canonical_personality_source" in pc_tests
+                  and "NATÜRLICHKEIT IST WICHTIGER ALS PERFEKTE FORMULIERUNGEN" in personality
               ),
               "PC proactive prompt uses the same personality and memory snapshot": (
                   "build_system_prompt(personality)" in server

@@ -138,6 +138,21 @@ class PipServerTests(unittest.TestCase):
         self.assertEqual(messages[-1]["content"], "Was mag ich?")
         self.assertTrue(any(m["content"] == "Merk dir: Ich mag Kaffee." for m in messages))
 
+    def test_pc_and_android_share_canonical_personality_source(self):
+        prompt_path = Path(pip_server.__file__).with_name("pip-personality.txt")
+        self.assertEqual(
+            pip_server.SYSTEM_PROMPT,
+            prompt_path.read_text(encoding="utf-8").strip(),
+        )
+        for required in (
+            "NATÜRLICHKEIT IST WICHTIGER ALS PERFEKTE FORMULIERUNGEN",
+            "Keine Standard-Anfänge",
+            "Erfinde keine Erinnerungen",
+            "Bei ernsten Problemen",
+            "Romantik und einvernehmliches Flirten zwischen Erwachsenen",
+        ):
+            self.assertIn(required, pip_server.SYSTEM_PROMPT)
+
     def test_android_personality_settings_are_applied_to_pc_prompt(self):
         status, body = self.request(
             "/chat", method="POST",
